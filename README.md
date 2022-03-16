@@ -12,4 +12,4 @@
 
 ### DB structure and relationships
 
-![db][images/db.png]
+![db](images/db.png)
