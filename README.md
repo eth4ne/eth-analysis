@@ -9,3 +9,7 @@
 
 * [miner_block.js](miner_block.js), [miner_uncle.js](miner_uncle.js)
   * Node.js scripts to iterate through the ```blocks``` and ```uncles``` table to count mined blocks and uncles for every account.
+
+### DB structure and relationships
+
+![db][images/db.png]
