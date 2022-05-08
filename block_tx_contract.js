@@ -39,6 +39,8 @@ async function run(from, to) {
   await conn.beginTransaction();
   const commit_period_max = 100;
   let commit_period = 1;
+  let time_prev = start;
+  let cnt_block_prev = 0, cnt_tx_prev = 0, cnt_uncle_prev = 0;
   if (to - from > commit_period_max) {
     commit_period = commit_period_max;
   } else {
@@ -103,7 +105,16 @@ async function run(from, to) {
     }
     if (i % 1000 === 0) {
       let ms = new Date() - start;
-      console.error('Blk height: %d, Blkn: %d(%d/s), Txn: %d(%d/s), Ucln: %d(%d/s), Time: %dms', i, cnt_block, (cnt_block/ms*1000).toFixed(2), cnt_tx, (cnt_tx/ms*1000).toFixed(2), cnt_uncle, (cnt_uncle/ms*1000).toFixed(2), ms);
+      let interval = new Date() - time_prev;
+      
+      console.error('Block #%d', i);
+      console.error('Speed: %dbps, %dtps, %dups (Time interval %ds)', ((cnt_block-cnt_block_prev)/interval*1000).toFixed(1), ((cnt_tx-cnt_tx_prev)/interval*1000).toFixed(1), ((cnt_uncle-cnt_uncle_prev)/ms*1000).toFixed(1), (interval/1000).toFixed(2));
+      console.error('Avg: %dbps, %dtps, %dups (%dblk / %dtx / %ducl in %ds)', ((cnt_block)/ms*1000).toFixed(1), ((cnt_tx)/ms*1000).toFixed(1), ((cnt_uncle)/ms*1000).toFixed(1), cnt_block, cnt_tx, cnt_uncle, (ms/1000).toFixed(2));
+      
+      time_prev = new Date();
+      cnt_block_prev = cnt_block;
+      cnt_tx_prev = cnt_tx;
+      cnt_uncle_prev = cnt_uncle;
     }
   }
   await conn.commit();
