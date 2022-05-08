@@ -59,9 +59,13 @@ async function run(from, to) {
           try {
             let tx = await web3.eth.getTransactionFromBlock(i, j);
             if (tx.to === null) {
-              let receipt = await web3.eth.getTransactionReceipt(tx.hash);
-              await insert_contract_batch(conn, receipt.contractAddress, tx.hash);
-              await insert_account_batch(conn, null, receipt.contractAddress, 0, 0, 0, 0, null, null, null, null, null, 1);
+              try {
+                let receipt = await web3.eth.getTransactionReceipt(tx.hash);
+                await insert_contract_batch(conn, receipt.contractAddress, tx.hash);
+                await insert_account_batch(conn, null, receipt.contractAddress, 0, 0, 0, 0, null, null, null, null, null, 1);
+              } catch {
+                console.log('Error request: blk #%d, tx #%d (contract)', i, j);
+              }
             }
             await insert_tx_batch(conn, block, tx, 0);
             cnt_tx++;
@@ -96,6 +100,7 @@ async function run(from, to) {
             conn.rollback();
             conn.destroy();
           } catch (err) {
+            console.log('Error commiting, failed to rollback: %d', cnt_block);
           }
           conn = await connect_db();
           await conn.query('SET SESSION foreign_key_checks=OFF;');
