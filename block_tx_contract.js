@@ -2,7 +2,6 @@ const Web3 = require('web3');
 const mariadb = require('mariadb');
 const net = require('net');
 
-const db_host = 'localhost';
 const db_socket = '/run/mysqld/mysqld.sock';
 
 const db_user = 'ethereum';
