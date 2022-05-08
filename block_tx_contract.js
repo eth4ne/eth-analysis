@@ -9,6 +9,7 @@ const db_pass = '';
 const db_name = 'ethereum';
 
 const geth_ipc_path = '/ethereum/geth/geth.ipc';
+const block_limit = 14000000;
 
 let cnt_block = 0, cnt_tx = 0, cnt_uncle = 0;
 let running = false;
@@ -166,13 +167,14 @@ async function stationkeep() {
     conn.query("SELECT * FROM `blocks` ORDER BY `number` DESC LIMIT 1;").then(async function(res) {
       let web3 = connect_web3();
       let latest = await web3.eth.getBlock('latest');
+      let target = Math.min(latest.number, block_limit+1);
       if (res.length === 0) {
-        console.error('Run from start');
-        run(0, 1);
+        console.error('Run from start to %d', target-1);
+        run(0, target-1);
       }
-      if (res[0].number < latest.number) {
-        console.error('Run from %d to %d', res[0].number+1, latest.number-1);
-        run(res[0].number+1, latest.number-1);
+      if (res[0].number < target) {
+        console.error('Run from %d to %d', res[0].number+1, target-1);
+        run(res[0].number+1, target-1);
       } else {
         running = false;
       }
