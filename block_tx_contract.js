@@ -133,7 +133,7 @@ async function insert_block_batch (conn, block, txn) {
 
 async function insert_tx_batch (conn, block, tx) {
   try {
-    await conn.query("INSERT INTO `transactions` (`blocknumber`, `hash`, `from`, `to`, `gas`, `gasprice`, `input`, `nonce`, `transactionindex`, `value`, `v`, `r`, `s`, `type`, `_iscontract`) VALUES (?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), ?, ?, UNHEX(SUBSTRING(?, 3)), ?, ?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), ?);", [block.number, tx.hash, tx.from, tx.to, tx.gas, tx.gasPrice, tx.input, tx.nonce, tx.transactionIndex, tx.value, tx.v, tx.r, tx.s, tx.type, null]);
+    await conn.query("INSERT INTO `transactions` (`blocknumber`, `hash`, `from`, `to`, `gas`, `gasprice`, `input`, `nonce`, `transactionindex`, `value`, `v`, `r`, `s`, `type`) VALUES (?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), ?, ?, UNHEX(SUBSTRING(?, 3)), ?, ?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)));", [block.number, tx.hash, tx.from, tx.to, tx.gas, tx.gasPrice, tx.input, tx.nonce, tx.transactionIndex, tx.value, tx.v, tx.r, tx.s, tx.type]);
   } catch (err) {
     console.log(err);
     console.log('Error insert: blk #%d, tx #%d', block.number, tx.transactionIndex);
