@@ -9,7 +9,8 @@ const db_pass = '';
 const db_name = 'ethereum';
 
 const geth_ipc_path = '/ethereum/geth/geth.ipc';
-const block_limit = 14000000;
+
+const block_limit = 15000000;
 
 let cnt_block = 0, cnt_tx = 0, cnt_uncle = 0;
 let running = false;
