@@ -73,7 +73,6 @@ async function add_account_block (address, number) {
         contract: query[0].contract,
         firsttx: query[0].firsttx,
         lasttx: query[0].lasttx,
-        balance: query[0].balance,
         minedblockn: query[0].minedblockn,
         minedunclen: query[0].minedunclen,
         _type: query[0]._type,
@@ -87,7 +86,6 @@ async function add_account_block (address, number) {
         contract: 0,
         firsttx: null,
         lasttx: null,
-        balance: null,
         minedblockn: 0,
         minedunclen: 0,
         _type: 0,
@@ -102,7 +100,7 @@ async function flush_accounts () {
   let cnt = 0;
   await conn.beginTransaction();
   for (let i in cache) {
-    insert_account_batch(conn, cache[i].id, i, cache[i].txn, cache[i].sent, cache[i].received, cache[i].contract, cache[i].firsttx, cache[i].lasttx, cache[i].balance, cache[i].minedblockn, cache[i].minedunclen, cache[i]._type);
+    insert_account_batch(conn, cache[i].id, i, cache[i].txn, cache[i].sent, cache[i].received, cache[i].contract, cache[i].firsttx, cache[i].lasttx, cache[i].minedblockn, cache[i].minedunclen, cache[i]._type);
     cnt++;
   }
   try {
@@ -121,11 +119,11 @@ async function flush_accounts () {
   }
 }
 
-async function insert_account_batch (conn, id, address, txn, sent, received, contract, firsttx, lasttx, balance, minedblockn, minedunclen, _type) {
+async function insert_account_batch (conn, id, address, txn, sent, received, contract, firsttx, lasttx, minedblockn, minedunclen, _type) {
   try {
     if (id === null) {
       let addr = Buffer.from(address, 'hex');
-      mysql_query(conn, "INSERT INTO `accounts` (`address`, `txn`, `sent`, `received`, `contract`, `firsttx`, `lasttx`, `balance`, `minedblockn`, `minedunclen`, `_type`) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", [addr, txn, sent, received, contract, firsttx, lasttx, balance, minedblockn, minedunclen, _type]);
+      mysql_query(conn, "INSERT INTO `accounts` (`address`, `txn`, `sent`, `received`, `contract`, `firsttx`, `lasttx`, `minedblockn`, `minedunclen`, `_type`) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", [addr, txn, sent, received, contract, firsttx, lasttx, minedblockn, minedunclen, _type]);
     } else {
       mysql_query(conn, "UPDATE `accounts` SET `minedblockn`=? WHERE `id`=?;", [minedblockn, id]);
     }
