@@ -12,7 +12,7 @@ interval = 100000
 
 conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host, user=user, password=password, database=database, cursorclass=pymysql.cursors.DictCursor)
 
-#type
+#state operation type
 #1: miner
 #3: uncle
 #8: read by transfer tx
@@ -24,6 +24,14 @@ conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host,
 #14: read by contract deploy tx
 #15: write by contract deploy tx
 
+#tx type
+#0: transfer (balance)
+#1: failed transfer
+#3: failed (not classified)
+#4: contract deploy
+#5: failed contract deploy
+#6: contract call
+#7: failed contract call
 
 def run(_from, _to):
   conn = conn_mariadb(db_host, db_user, db_pass, db_name)
@@ -32,6 +40,7 @@ def run(_from, _to):
   cnt_block = 0
   cnt_tx = 0
   cnt_slot = 0
+  cnt_state = 0
   for blockheight in range(_from, _to, interval):
     filename = 'txsubstate/TxSubstate{}-{}.txt'.format(blockheight, blockheight+interval-1)
     f = open(filename, 'r')
@@ -131,8 +140,15 @@ def run(_from, _to):
                   'value': val.split(',value:0x')[1]
                 })
             writes.append(write_data)
-          if len(block_tx_table[txhash]['to']) == 0:
-            txtype = 'ContractDeploy'
+          if txtype == 'Transfer':
+            txclass = 0
+          elif txtype == 'Failed':
+            txclass = 3
+          elif txtype == 'ContractDeploy':
+            txclass = 4
+          elif txtype == 'ContractCall':
+            txclass = 6
+          
           block_txs_read.append({
             'index': block_tx_table[txhash]['index'],
             'hash': txhash,
@@ -140,7 +156,8 @@ def run(_from, _to):
             'reads': reads,
             'writes': writes,
             'deployedca': deployedca,
-            'cacode': cacode
+            'cacode': cacode,
+            'txclass': txclass
           })
           
       block_txs_sorted = sorted(block_txs_read, key=lambda x: x['index'])
@@ -148,7 +165,7 @@ def run(_from, _to):
       for tx in block_txs_sorted:
         if tx['type'] == 'Transfer':
           type_value = 8
-        elif tx['type'] == 'Failed':
+        elif tx['type'][:6] == 'Failed':
           type_value = 10
         elif tx['type'] == 'ContractCall':
           type_value = 12
@@ -158,9 +175,26 @@ def run(_from, _to):
         else:
           print(tx['type'])
           exit()
+        update_tx(cursor, tx['hash'], tx['txclass'])
         for read in tx['reads']:
+          account = find_account(cursor, read['address'])
+          if account == None:
+            insert_account(cursor, read['address'], blocknumber, 10)
           insert_state(cursor, blocknumber, read['address'], None, None, None, None, tx['hash'], type_value)
+          cnt_state += 1
         for write in tx['writes']:
+          account = find_account(cursor, write['address'])
+          if account == None:
+            if write['code'] == None:
+              insert_account(cursor, write['address'], blocknumber, 4)
+            else:
+              insert_account(cursor, write['address'], blocknumber, 7)
+              insert_contract(cursor, write['address'], tx['hash'], write['code'])
+          elif account['_type'] == 0 or account['_type'] == 10:
+            if write['code'] == None:
+              update_account_type(cursor, write['address'], 6)
+            else:
+              update_account_type(cursor, write['address'], 9)
           insert_state(cursor, blocknumber, write['address'], write['nonce'], write['balance'], write['codehash'], write['storageroot'], tx['hash'], type_value+1)
           if len(write['slotlogs']) > 0:
             state = get_latest_state(cursor)
@@ -170,7 +204,7 @@ def run(_from, _to):
       if blocknumber % 2000 == 0:
         conn.commit()
         seconds = time.time() - start
-        print('#{}, Blkn: {}({:.2f}/s), Txn: {}({:.2f}/s), Slotn: {}({:.2f}/s), Time: {}ms'.format(blocknumber, cnt_block, cnt_block/seconds, cnt_tx, cnt_tx/seconds, cnt_slot, cnt_slot/seconds, int(seconds*1000)))
+        print('#{}, Blkn: {}({:.2f}/s), Txn: {}({:.2f}/s), Staten: {}({:.2f}/s), Slotn: {}({:.2f}/s), Time: {}ms'.format(blocknumber, cnt_block, cnt_block/seconds, cnt_tx, cnt_tx/seconds, cnt_state, cnt_state/seconds, cnt_slot, cnt_slot/seconds, int(seconds*1000)))
     print('Indexed {}'.format(filename))
 
 def get_latest_state(cursor):
@@ -187,6 +221,14 @@ def update_contract(cursor, address, code):
   sql = "UPDATE `contracts` SET `code`=UNHEX(%s) WHERE `address`=UNHEX(%s);"
   cursor.execute(sql, (code, address)) 
 
+def update_tx(cursor, txhash, txclass):
+  sql = "UPDATE `transactions` SET `class`=%s WHERE `hash`=UNHEX(%s);"
+  cursor.execute(sql, (txclass, txhash))
+
+def update_account_type(cursor, address, type):
+  sql = "UPDATE `accounts` SET `_type`=%s WHERE `address`=UNHEX(%s);"
+  cursor.execute(sql, (type, address))
+
 def insert_state(cursor, blocknumber, address, nonce, balance, codehash, storageroot, txhash, type_value):
   sql = "INSERT INTO `states` (`blocknumber`, `type`, `address`, `nonce`, `balance`, `codehash`, `storageroot`, `txhash`) VALUES (%s, %s, UNHEX(%s), %s, %s, UNHEX(%s), UNHEX(%s), UNHEX(%s));"
   cursor.execute(sql, (blocknumber, type_value, address, nonce, balance, codehash, storageroot, txhash))
@@ -199,6 +241,14 @@ def insert_uncle(cursor, blocknumber, address, nonce, balance, codehash, storage
   sql = "INSERT INTO `states` (`blocknumber`, `type`, `address`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, UNHEX(%s), %s, %s, UNHEX(%s), UNHEX(%s));"
   cursor.execute(sql, (blocknumber, 3, address, nonce, balance, codehash, storageroot))
 
+def insert_account(cursor, address, blocknumber, type):
+  sql = "INSERT INTO `accounts` (`address`, `txn`, `sent`, `received`, `contract`, `firsttx`, `lasttx`, `minedblockn`, `minedunclen`, `_type`) VALUES (UNHEX(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s);"
+  cursor.execute(sql, (address, 0, 0, 0, 0, blocknumber, blocknumber, 0, 0, type))
+
+def insert_contract(cursor, address, creationtx, code):
+  sql = "INSERT INTO `contracts` (`address`, `creationtx`, `code`) VALUES (UNHEX(%s), UNHEX(%s), UNHEX(%s));"
+  cursor.execute(sql, (address, creationtx, code))
+
 def select_txs(cursor, blocknumber):
   sql = "SELECT * FROM `transactions` WHERE `blocknumber`=%s;"
   cursor.execute(sql, (blocknumber,))
@@ -210,7 +260,11 @@ def select_tx(cursor, txhash):
   cursor.execute(sql, (txhash,))
   result = cursor.fetchone()
   return result
-
-
+  
+def find_account(cursor, address):
+  sql = "SELECT * FROM `accounts` WHERE `address`=UNHEX(%s);"
+  cursor.execute(sql, (address,))
+  result = cursor.fetchone()
+  return result
 
 run(start_block, end_block)
