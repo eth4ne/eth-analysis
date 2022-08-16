@@ -23,6 +23,7 @@ conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host,
 #13: write by contract call tx
 #14: read by contract deploy tx
 #15: write by contract deploy tx
+#17: initial alloc
 
 #tx type
 #0: transfer (balance)
@@ -32,6 +33,18 @@ conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host,
 #5: failed contract deploy
 #6: contract call
 #7: failed contract call
+
+#type 0: EoA or CA (first appears in Tx)
+#type 1: CA (null or not null), Deployed from EoA
+#type 2: Null contract, deployed from EoA
+#type 3: CA, not deployed from EoA
+#type 4: EoA, may include null contract (transfer or write from CA)
+#type 5: CA (not null), deployed from EoA
+#type 6: EoA, first appears in Tx or contract write
+#type 7: CA (transfer or write from CA)
+#type 9: CA, first appears in Tx, 
+#type 10: EoA or CA (first appears as read in state access)
+#type 11: Eoa or CA (first appears in presale)
 
 def run(_from, _to):
   conn = conn_mariadb(db_host, db_user, db_pass, db_name)
@@ -142,8 +155,12 @@ def run(_from, _to):
             writes.append(write_data)
           if txtype == 'Transfer':
             txclass = 0
-          elif txtype == 'Failed':
-            txclass = 3
+          elif txtype == 'Failed_transfer':
+            txclass = 1
+          elif txtype == 'Failed_contractdeploy':
+            txclass = 5
+          elif txtype == 'Failed_contractcall':
+            txclass = 7
           elif txtype == 'ContractDeploy':
             txclass = 4
           elif txtype == 'ContractCall':
@@ -186,14 +203,17 @@ def run(_from, _to):
           account = find_account(cursor, write['address'])
           if account == None:
             if write['code'] == None:
+              #is transfer?
               insert_account(cursor, write['address'], blocknumber, 4)
             else:
+              #is transfer? 
               insert_account(cursor, write['address'], blocknumber, 7)
               insert_contract(cursor, write['address'], tx['hash'], write['code'])
-          elif account['_type'] == 0 or account['_type'] == 10:
+          elif account['_type'] == 0 or account['_type'] == 10 or account['_type'] == 11:
             if write['code'] == None:
               update_account_type(cursor, write['address'], 6)
             else:
+              ######deployed from CA or Tx?
               update_account_type(cursor, write['address'], 9)
           insert_state(cursor, blocknumber, write['address'], write['nonce'], write['balance'], write['codehash'], write['storageroot'], tx['hash'], type_value+1)
           if len(write['slotlogs']) > 0:
