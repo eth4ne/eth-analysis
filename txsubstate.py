@@ -12,6 +12,9 @@ interval = 100000
 
 conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host, user=user, password=password, database=database, cursorclass=pymysql.cursors.DictCursor)
 
+emptystorageroot = 'pty'
+emptycodehash = 'pty'
+
 #state operation type
 #1: miner
 #3: uncle
@@ -42,7 +45,7 @@ conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host,
 #type 5: CA (not null), deployed from EoA
 #type 6: EoA, first appears in Tx or contract write
 #type 7: CA (transfer or write from CA)
-#type 9: CA, first appears in Tx, 
+#type 9: CA, first appears in Tx, read or presale
 #type 10: EoA or CA (first appears as read in state access)
 #type 11: Eoa or CA (first appears in presale)
 
@@ -78,8 +81,8 @@ def run(_from, _to):
           miner_address = miner[0].split(':0x')[1].lower()
           miner_nonce = miner[1].split(':')[1]
           miner_balance = miner[2].split(':')[1]
-          miner_codehash = miner[3].split(':0x')[1]
-          miner_storageroot = miner[4].split(':0x')[1]
+          miner_codehash = miner[3].split(':')[1][2:]
+          miner_storageroot = miner[4].split(':')[1][2:]
           insert_miner(cursor, blocknumber, miner_address, miner_nonce, miner_balance, miner_codehash, miner_storageroot)
 
         if type == 'Uncle':
@@ -87,8 +90,8 @@ def run(_from, _to):
           uncle_address = uncle[0].split(':0x')[1].lower()
           uncle_nonce = uncle[1].split(':')[1]
           uncle_balance = uncle[2].split(':')[1]
-          uncle_codehash = uncle[3].split(':0x')[1]
-          uncle_storageroot = uncle[4].split(':0x')[1]
+          uncle_codehash = uncle[3].split(':')[1][2:]
+          uncle_storageroot = uncle[4].split(':')[1][2:]
           insert_uncle(cursor, blocknumber, uncle_address, uncle_nonce, uncle_balance, uncle_codehash, uncle_storageroot)
 
         if type == 'TxHash':
@@ -138,12 +141,12 @@ def run(_from, _to):
               elif key == 'Balance':
                 write_data['balance'] = val.split(':')[1]
               elif key == 'CodeHash':
-                write_data['codehash'] = val.split(':0x')[1]
+                write_data['codehash'] = val.split(':')[1][2:]
               elif key == 'Code':
                 write_data['code'] = val.split(':')[1]
                 cacode = val.split(':')[1]
               elif key == 'StorageRoot':
-                write_data['storageroot'] = val.split(':0x')[1]
+                write_data['storageroot'] = val.split(':')[1][2:]
               elif key == 'Storage':
                 pass
               elif key == 'slot':
@@ -197,25 +200,22 @@ def run(_from, _to):
           account = find_account(cursor, read['address'])
           if account == None:
             insert_account(cursor, read['address'], blocknumber, 10)
-          insert_state(cursor, blocknumber, read['address'], None, None, None, None, tx['hash'], type_value)
+          insert_state(cursor, blocknumber, read['address'], None, None, None, None, tx['index'], type_value)
           cnt_state += 1
         for write in tx['writes']:
           account = find_account(cursor, write['address'])
           if account == None:
             if write['code'] == None:
-              #is transfer?
               insert_account(cursor, write['address'], blocknumber, 4)
             else:
-              #is transfer? 
               insert_account(cursor, write['address'], blocknumber, 7)
               insert_contract(cursor, write['address'], tx['hash'], write['code'])
           elif account['_type'] == 0 or account['_type'] == 10 or account['_type'] == 11:
             if write['code'] == None:
               update_account_type(cursor, write['address'], 6)
             else:
-              ######deployed from CA or Tx?
               update_account_type(cursor, write['address'], 9)
-          insert_state(cursor, blocknumber, write['address'], write['nonce'], write['balance'], write['codehash'], write['storageroot'], tx['hash'], type_value+1)
+          insert_state(cursor, blocknumber, write['address'], write['nonce'], write['balance'], write['codehash'], write['storageroot'], tx['index'], type_value+1)
           if len(write['slotlogs']) > 0:
             state = get_latest_state(cursor)
             for slot in write['slotlogs']:
@@ -234,8 +234,30 @@ def get_latest_state(cursor):
   return result
 
 def insert_slot(cursor, stateid, address, slot, slotvalue):
-  sql = "INSERT INTO `slotlogs` (`stateid`, `address`, `slot`, `slotvalue`) VALUES (%s, UNHEX(%s), UNHEX(%s), UNHEX(%s));"
-  cursor.execute(sql, (stateid, address, slot, slotvalue))
+  sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
+  cursor.execute(sql, (address,))
+  result = cursor.fetchone()
+  if result == None:
+    sql = "INSERT INTO `addresses` SET `address`=UNHEX(%s);"
+    cursor.execute(sql, (address,))
+    sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
+    cursor.execute(sql, (address,))
+    result = cursor.fetchone()
+  address_id = result['id']
+
+  sql = "SELECT * FROM `slots` WHERE `slot`=UNHEX(%s);"
+  cursor.execute(sql, (slot,))
+  result = cursor.fetchone()
+  if result == None:
+    sql = "INSERT INTO `slots` SET `slot`=UNHEX(%s);"
+    cursor.execute(sql, (slot,))
+    sql = "SELECT * FROM `slots` WHERE `slot`=UNHEX(%s);"
+    cursor.execute(sql, (slot,))
+    result = cursor.fetchone()
+  slot_id = result['id']
+
+  sql = "INSERT INTO `slotlogs` (`stateid`, `address_id`, `slot_id`, `slotvalue`) VALUES (%s, %s, %s, UNHEX(%s));"
+  cursor.execute(sql, (stateid, address_id, slot_id, slotvalue))
 
 def update_contract(cursor, address, code):
   sql = "UPDATE `contracts` SET `code`=UNHEX(%s) WHERE `address`=UNHEX(%s);"
@@ -249,17 +271,81 @@ def update_account_type(cursor, address, type):
   sql = "UPDATE `accounts` SET `_type`=%s WHERE `address`=UNHEX(%s);"
   cursor.execute(sql, (type, address))
 
-def insert_state(cursor, blocknumber, address, nonce, balance, codehash, storageroot, txhash, type_value):
-  sql = "INSERT INTO `states` (`blocknumber`, `type`, `address`, `nonce`, `balance`, `codehash`, `storageroot`, `txhash`) VALUES (%s, %s, UNHEX(%s), %s, %s, UNHEX(%s), UNHEX(%s), UNHEX(%s));"
-  cursor.execute(sql, (blocknumber, type_value, address, nonce, balance, codehash, storageroot, txhash))
+def insert_state(cursor, blocknumber, address, nonce, balance, codehash, storageroot, txindex, type_value):
+  sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
+  cursor.execute(sql, (address,))
+  result = cursor.fetchone()
+  if result == None:
+    sql = "INSERT INTO `addresses` SET `address`=UNHEX(%s);"
+    cursor.execute(sql, (address,))
+    sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
+    cursor.execute(sql, (address,))
+    result = cursor.fetchone()
+  address_id = result['id']
+
+  if codehash == emptycodehash and storageroot == emptystorageroot:
+    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`, `txindex`) VALUES (%s, %s, %s, %s, %s, NULL, NULL, %s);"
+    cursor.execute(sql, (blocknumber, type_value, address_id, nonce, balance, txindex))
+  elif codehash == emptycodehash:
+    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`, `txindex`) VALUES (%s, %s, %s, %s, %s, NULL, UNHEX(%s), %s);"
+    cursor.execute(sql, (blocknumber, type_value, address_id, nonce, balance, storageroot, txindex))
+  elif storageroot == emptystorageroot:
+    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`, `txindex`) VALUES (%s, %s, %s, %s, %s, UNHEX(%s), NULL, %s);"
+    cursor.execute(sql, (blocknumber, type_value, address_id, nonce, balance, codehash, txindex))
+  else:
+    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`, `txindex`) VALUES (%s, %s, %s, %s, %s, UNHEX(%s), UNHEX(%s), %s);"
+    cursor.execute(sql, (blocknumber, type_value, address_id, nonce, balance, codehash, storageroot, txindex))
 
 def insert_miner(cursor, blocknumber, address, nonce, balance, codehash, storageroot):
-  sql = "INSERT INTO `states` (`blocknumber`, `type`, `address`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, UNHEX(%s), %s, %s, UNHEX(%s), UNHEX(%s));"
-  cursor.execute(sql, (blocknumber, 1, address, nonce, balance, codehash, storageroot))
+  sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
+  cursor.execute(sql, (address,))
+  result = cursor.fetchone()
+  if result == None:
+    sql = "INSERT INTO `addresses` SET `address`=UNHEX(%s);"
+    cursor.execute(sql, (address,))
+    sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
+    cursor.execute(sql, (address,))
+    result = cursor.fetchone()
+  address_id = result['id']
+
+  if codehash == emptycodehash and storageroot == emptystorageroot:
+    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, NULL, NULL);"
+    cursor.execute(sql, (blocknumber, 1, address_id, nonce, balance))
+  elif codehash == emptycodehash:
+    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, NULL, UNHEX(%s));"
+    cursor.execute(sql, (blocknumber, 1, address_id, nonce, balance, storageroot))
+  elif storageroot == emptystorageroot:
+    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s), %s, %s, UNHEX(%s), NULL);"
+    cursor.execute(sql, (blocknumber, 1, address_id, nonce, balance, codehash))
+  else:
+    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, UNHEX(%s), UNHEX(%s));"
+    cursor.execute(sql, (blocknumber, 1, address_id, nonce, balance, codehash, storageroot))
 
 def insert_uncle(cursor, blocknumber, address, nonce, balance, codehash, storageroot):
-  sql = "INSERT INTO `states` (`blocknumber`, `type`, `address`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, UNHEX(%s), %s, %s, UNHEX(%s), UNHEX(%s));"
-  cursor.execute(sql, (blocknumber, 3, address, nonce, balance, codehash, storageroot))
+  sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
+  cursor.execute(sql, (address,))
+  result = cursor.fetchone()
+  if result == None:
+    sql = "INSERT INTO `addresses` SET `address`=UNHEX(%s);"
+    cursor.execute(sql, (address,))
+    sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
+    cursor.execute(sql, (address,))
+    result = cursor.fetchone()
+  address_id = result['id']
+
+  if codehash == emptycodehash and storageroot == emptystorageroot:
+    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, NULL, NULL);"
+    cursor.execute(sql, (blocknumber, 3, address_id, nonce, balance))
+  elif codehash == emptycodehash:
+    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, NULL, UNHEX(%s));"
+    cursor.execute(sql, (blocknumber, 3, address_id, nonce, balance, storageroot))
+  elif storageroot == emptystorageroot:
+    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, UNHEX(%s), NULL);"
+    cursor.execute(sql, (blocknumber, 3, address_id, nonce, balance, codehash))
+  else:
+    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, UNHEX(%s), UNHEX(%s);"
+    cursor.execute(sql, (blocknumber, 3, address_id, nonce, balance, codehash, storageroot))
+  
 
 def insert_account(cursor, address, blocknumber, type):
   sql = "INSERT INTO `accounts` (`address`, `txn`, `sent`, `received`, `contract`, `firsttx`, `lasttx`, `minedblockn`, `minedunclen`, `_type`) VALUES (UNHEX(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s);"
