@@ -22,6 +22,12 @@ CREATE TABLE `accounts` (
   `_type` tinyint(4) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=ascii;
 
+CREATE TABLE `addresses` (
+  `id` int(11) NOT NULL,
+  `address` binary(20) NOT NULL,
+  `_type` tinyint(4) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=ascii;
+
 CREATE TABLE `blocks` (
   `number` int(11) NOT NULL,
   `timestamp` int(11) NOT NULL,
@@ -54,17 +60,22 @@ CREATE TABLE `contracts` (
 CREATE TABLE `slotlogs` (
   `id` bigint(20) NOT NULL,
   `stateid` bigint(20) NOT NULL,
-  `address` binary(20) NOT NULL,
-  `slot` binary(64) NOT NULL,
+  `address_id` int(11) NOT NULL,
+  `slot_id` int(11) NOT NULL,
   `slotvalue` varbinary(64) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=ascii;
+
+CREATE TABLE `slots` (
+  `id` int(11) NOT NULL,
+  `slot` binary(32) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=ascii;
 
 CREATE TABLE `states` (
   `id` bigint(20) NOT NULL,
   `blocknumber` int(11) NOT NULL,
   `type` tinyint(4) DEFAULT NULL,
-  `txhash` binary(32) DEFAULT NULL,
-  `address` binary(20) NOT NULL,
+  `txindex` int(11) DEFAULT NULL,
+  `address_id` int(11) NOT NULL,
   `nonce` int(11) DEFAULT NULL,
   `balance` decimal(32,0) DEFAULT NULL,
   `codehash` binary(32) DEFAULT NULL,
@@ -127,6 +138,11 @@ ALTER TABLE `accounts`
   ADD KEY `minedunclen` (`minedunclen`),
   ADD KEY `type` (`_type`);
 
+ALTER TABLE `addresses`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `address` (`address`) USING BTREE,
+  ADD KEY `_type` (`_type`);
+
 ALTER TABLE `blocks`
   ADD PRIMARY KEY (`number`),
   ADD UNIQUE KEY `hash` (`hash`),
@@ -136,21 +152,23 @@ ALTER TABLE `blocks`
 ALTER TABLE `contracts`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `address` (`address`),
-  ADD UNIQUE KEY `creationtx` (`creationtx`);
+  ADD KEY `creationtx` (`creationtx`) USING BTREE;
 
 ALTER TABLE `slotlogs`
   ADD PRIMARY KEY (`id`),
   ADD KEY `stateid` (`stateid`),
-  ADD KEY `slothash` (`slot`),
-  ADD KEY `slotvalue` (`slotvalue`),
-  ADD KEY `address` (`address`);
+  ADD KEY `address_id` (`address_id`),
+  ADD KEY `slot_id` (`slot_id`);
+
+ALTER TABLE `slots`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `slot` (`slot`) USING BTREE;
 
 ALTER TABLE `states`
   ADD PRIMARY KEY (`id`),
   ADD KEY `type` (`type`),
-  ADD KEY `address` (`address`),
   ADD KEY `blocknumber` (`blocknumber`),
-  ADD KEY `txhash` (`txhash`);
+  ADD KEY `address_id` (`address_id`);
 
 ALTER TABLE `transactions`
   ADD PRIMARY KEY (`id`),
@@ -172,6 +190,9 @@ ALTER TABLE `uncles`
 ALTER TABLE `accounts`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
+ALTER TABLE `addresses`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
 ALTER TABLE `blocks`
   MODIFY `number` int(11) NOT NULL AUTO_INCREMENT;
 
@@ -180,6 +201,9 @@ ALTER TABLE `contracts`
 
 ALTER TABLE `slotlogs`
   MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE `slots`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 ALTER TABLE `states`
   MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
@@ -200,17 +224,10 @@ ALTER TABLE `blocks`
   ADD CONSTRAINT `blocks_ibfk_2` FOREIGN KEY (`parenthash`) REFERENCES `blocks` (`hash`) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 ALTER TABLE `contracts`
-  ADD CONSTRAINT `contracts_ibfk_1` FOREIGN KEY (`address`) REFERENCES `accounts` (`address`) ON DELETE NO ACTION ON UPDATE NO ACTION,
   ADD CONSTRAINT `contracts_ibfk_2` FOREIGN KEY (`creationtx`) REFERENCES `transactions` (`hash`) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
-ALTER TABLE `slotlogs`
-  ADD CONSTRAINT `slotlogs_ibfk_1` FOREIGN KEY (`stateid`) REFERENCES `states` (`id`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  ADD CONSTRAINT `slotlogs_ibfk_2` FOREIGN KEY (`address`) REFERENCES `accounts` (`address`) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
 ALTER TABLE `states`
-  ADD CONSTRAINT `states_ibfk_2` FOREIGN KEY (`blocknumber`) REFERENCES `blocks` (`number`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  ADD CONSTRAINT `states_ibfk_3` FOREIGN KEY (`address`) REFERENCES `accounts` (`address`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  ADD CONSTRAINT `states_ibfk_4` FOREIGN KEY (`txhash`) REFERENCES `transactions` (`hash`) ON DELETE NO ACTION ON UPDATE NO ACTION;
+  ADD CONSTRAINT `states_ibfk_2` FOREIGN KEY (`blocknumber`) REFERENCES `blocks` (`number`) ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 ALTER TABLE `transactions`
   ADD CONSTRAINT `transactions_ibfk_1` FOREIGN KEY (`blocknumber`) REFERENCES `blocks` (`number`) ON DELETE NO ACTION ON UPDATE NO ACTION,
