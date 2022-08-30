@@ -16,24 +16,15 @@ cursor = conn.cursor()
 
 for account, balance in alloc.items():
   address = account[2:]
-  sql = "SELECT * FROM `accounts` WHERE `address`=UNHEX(%s);"
-  cursor.execute(sql, (address,))
-  result = cursor.fetchone()
-  if result == None:
-    sql = "INSERT INTO `accounts` (`address`, `txn`, `sent`, `received`, `contract`, `firsttx`, `lasttx`, `minedblockn`, `minedunclen`, `_type`) VALUES (UNHEX(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s);"
-    cursor.execute(sql, (address, 0, 0, 0, 0, 0, 0, 0, 0, 11))
 
   sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
   cursor.execute(sql, (address,))
   result = cursor.fetchone()
   if result == None:
-    sql = "INSERT INTO `addresses` SET `address`=UNHEX(%s);"
-    cursor.execute(sql, (address,))
-    sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
-    cursor.execute(sql, (address,))
-    result = cursor.fetchone()
-  address_id = result['id']
-  cursor.execute("INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `balance`) VALUES (0, 17, %s, %s);", (address_id, balance['balance']))
+    sql = "INSERT INTO `addresses` SET `address`=UNHEX(%s), `_type`=%s;"
+    cursor.execute(sql, (address, 10))
+  address_id = cursor.lastrowid
+  cursor.execute("INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `balance`) VALUES (0, 31, %s, %s);", (address_id, balance['balance']))
 
 #cursor.execute("INSERT INTO `states` (`blocknumber`, `type`, `address`, `balance`) VALUES (0, 1, UNHEX('00000000000000000000000000000000'), 5000000000000000000);")
   
