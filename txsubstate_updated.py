@@ -1,4 +1,5 @@
 import pymysql.cursors
+import pymysql.err
 import time
 
 db_host = 'localhost'
@@ -7,26 +8,42 @@ db_pass = '' #fill in the MariaDB/MySQL password.
 db_name = 'ethereum'
 
 start_block = 1
-end_block = 2500000
+end_block = 1100000
 interval = 100000
+
+commit_interval = 2000
+log_interval = 2000
+execute_interval = 2000
 
 conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host, user=user, password=password, database=database, cursorclass=pymysql.cursors.DictCursor)
 
 emptystorageroot = 'pty'
 emptycodehash = 'pty'
 
+run_state = True
+run_slot = True
+run_contract = True
+run_account = True
+run_txtype = False
+
 #state operation type
 #1: miner
 #3: uncle
 #8: read by transfer tx
 #9: write by transfer tx
-#10: read by failed tx
-#11: write by failed tx
+#10: read by failed transfer tx
+#11: write by failed transfer tx
 #12: read by contract call tx
 #13: write by contract call tx
-#14: read by contract deploy tx
-#15: write by contract deploy tx
-#17: initial alloc
+#14: read by failed contract call tx
+#15: write by failed contract call tx
+#16: read by contract deploy tx
+#17: write by contract deploy tx
+#18: read by failed contract deploy tx
+#19: write by failed contract deploy tx
+
+#31: initial alloc
+
 
 #tx type
 #0: transfer (balance)
@@ -37,17 +54,21 @@ emptycodehash = 'pty'
 #6: contract call
 #7: failed contract call
 
-#type 0: EoA or CA (first appears in Tx)
-#type 1: CA (null or not null), Deployed from EoA
-#type 2: Null contract, deployed from EoA
-#type 3: CA, not deployed from EoA
-#type 4: EoA, may include null contract (transfer or write from CA)
-#type 5: CA (not null), deployed from EoA
-#type 6: EoA, first appears in Tx or contract write
-#type 7: CA (transfer or write from CA)
-#type 9: CA, first appears in Tx, read or presale
-#type 10: EoA or CA (first appears as read in state access, includes contract failed to be deployed)
-#type 11: Eoa or CA (first appears in presale)
+#account type (accounts table)
+#type 0: Uncertain (EoA or CA, first appears as tx from or to)
+#type 1: CA (deployed from EoA, parsed from transactionreceipt)
+
+#account type (addresses table)
+#type 4: Uncertain (EoA or CA, first appears as read in state access, includes contract failed to be deployed)
+#type 5: Uncertain (EoA or CA, first appears as block or uncle miner)
+#type 6: EoA (EoA or CA, first appears as write in state access)
+#type 7: CA (null or not null), Deployed from EoA
+#type 8: Uncertain (EoA or CA, first appears as block or uncle miner)
+#type 9: CA (null or not null), Deployed from CA
+#type 10: Uncertain (EoA or CA, presale)
+
+slot_cache = {}
+account_cache = {}
 
 def run(_from, _to):
   conn = conn_mariadb(db_host, db_user, db_pass, db_name)
@@ -57,6 +78,13 @@ def run(_from, _to):
   cnt_tx = 0
   cnt_slot = 0
   cnt_state = 0
+  latest_state = get_latest_state(cursor)
+  if latest_state == None:
+    state_id = 0
+  else:
+    state_id = latest_state['id']
+  state_updates = []
+  slots = []
   for blockheight in range(_from, _to, interval):
     filename = 'txsubstate/TxSubstate{}-{}.txt'.format(blockheight, blockheight+interval-1)
     f = open(filename, 'r')
@@ -65,17 +93,10 @@ def run(_from, _to):
       blocknumber = int(block.split('\n')[0].split(':')[1])
       cnt_block += 1
 
-      block_txs = select_txs(cursor, blocknumber)
-      block_tx_table = {}
-      block_txs_read = []
-
-      for tx in block_txs:
-        block_tx_table[tx['hash'].hex()] = {'index': tx['transactionindex'], 'to': tx['input']}
-
       txcount = block.count('!')
       for i in range(1, txcount+1):
         txbody = block.split('!')[i]
-        txdata = txbody.split('\n')
+        txdata = txbody.split('@')[0].split('\n')[:-1]
         tx = {
           'index': i-1,
           'hash': None,
@@ -84,8 +105,6 @@ def run(_from, _to):
           'to': None,
           'deployedca': None,
         }
-        reads = []
-        writes = []
         for j in txdata:
           k = j.split(':')[0]
           v = j.split(':')[1]
@@ -94,35 +113,53 @@ def run(_from, _to):
           elif k == 'Type':
             if v == 'Transfer':
               tx['type'] = 0
-              txclass = 0
+              state_type = 8
             elif v == 'Failed_transfer':
               tx['type'] = 1
+              state_type = 10
             elif v == 'Failed_contractdeploy':
               tx['type'] = 5
+              state_type = 18
             elif v == 'Failed_contractcall':
               tx['type'] = 7
+              state_type = 14
             elif v == 'ContractDeploy':
               tx['type'] = 4
+              state_type = 16
             elif v == 'ContractCall':
               tx['type'] = 6
+              state_type = 12
+            else:
+              print('Unhandled txn type: {}'.format(v))
+              exit()
           elif k == 'From':
             tx['from'] = v[2:]
           elif k == 'To':
             tx['to'] = v[2:]
           elif k == 'DeployedCA':
             tx['deployedca'] = v[2:]
-        readlist = txbody.split('@')[1].split('#')[0].split('.')[1:]
+        readlist = txbody.split('@')[1].split('#')[0].split('\n')[1:-1]
         for j in readlist:
-          reads.append(j.split(':')[1][2:])
+          address = j.split(':')[1][2:].lower()
+          if run_state == True:
+            address_id = find_account_id(cursor, address)
+            if address_id == None:
+              address_id = insert_account(cursor, address, 4)
+            state_update = prepare_state(blocknumber, address_id, None, None, None, None, tx['index'], state_type)
+            state_updates.append(state_update)
+            state_id += 1
+            cnt_state += 1
+            
         writelist = txbody.split('#')[1].split('$')[0].split('.')[1:]
         for j in writelist:
-          write_data = j.split('\n')
-          write_data =  {
+          write_data = j.split('\n')[:-1]
+          write =  {
             'address': None,
             'nonce': None,
             'balance': None,
             'codehash': None,
             'code': None,
+            'deployedbyca': False,
             'storageroot': None,
             'slotlogs': []
           }
@@ -130,28 +167,80 @@ def run(_from, _to):
             k = ij.split(':')[0]
             v = ij.split(':')[1]
             if k == 'address':
-              write_data['address'] = v[2:]
+              write['address'] = v[2:]
+            elif k == 'Deployedaddress':
+              write['address'] = v[2:]
+              write['deployedbyca'] = True
             elif k == 'Nonce':
-              write_data['nonce'] = v
+              write['nonce'] = v
             elif k == 'Balance':
-              write_data['balance'] = v
+              write['balance'] = v
             elif k == 'CodeHash':
-              write_data['codehash'] = v[2:]
+              write['codehash'] = v[2:]
             elif k == 'StorageRoot':
-              write_data['storageroot'] = v[2:]
+              write['storageroot'] = v[2:]
+            elif k == 'Code':
+              write['code'] = v
             elif k == 'Storage':
               pass
             elif k == 'slot':
-              slot = { 'hash': v.split(',value:0x')[0].split('0x')[1],'value': v.split(',value:0x')[1]}
+              slot = {'slot': v.split(',')[0].split('0x')[1],'value': ij.split(',value:0x')[1]}
+              write['slotlogs'].append(slot) 
 
+          if run_state == True:        
+            address_id = find_account_id(cursor, write['address'])
+            if address_id == None:
+              if write['code'] == None:
+                address_id = insert_account(cursor, write['address'], 6)
+              else:
+                address_id = insert_account(cursor, write['address'], 7)
+            state_update = prepare_state(blocknumber, address_id, write['nonce'], write['balance'], write['codehash'], write['storageroot'], tx['index'], state_type+1)
+            state_updates.append(state_update)
+            state_id += 1
+            if run_slot == True:
+              for ij in write['slotlogs']:
+                slot_id = find_slot_id(cursor, ij['slot'])
+                hexvalue = ij['value']
+                if hexvalue == '0':
+                  hexvalue = None
+                else:
+                  hexvalue = bytes.fromhex(hexvalue)
+                slot = (state_id, address_id, slot_id, hexvalue)
+                slots.append(slot)
+                cnt_slot += 1
+            cnt_state += 1
 
-      miner = block.split('$')[1].split('\n')[0:5]
-      miner_address = miner[0].split(':0x')[1].lower()
-      miner_nonce = miner[1].split(':')[1]
-      miner_balance = miner[2].split(':')[1]
-      miner_codehash = miner[3].split(':')[1][2:]
-      miner_storageroot = miner[4].split(':')[1][2:]
-      insert_miner(cursor, blocknumber, miner_address, miner_nonce, miner_balance, miner_codehash, miner_storageroot)
+          if run_contract == True:
+            if write['code'] != None:
+              if write['deployedbyca'] == True:
+                address_id = find_account_id(cursor, write['address'])
+                if address_id == None:
+                  address_id = insert_account(cursor, write['address'], 9)
+                else:
+                  update_account_type(cursor, address_id, 9)
+                insert_contract(cursor, write['address'], tx['hash'], write['code'])
+              else:
+                if tx['deployedca'] == write['address']:
+                  address_id = find_account_id(cursor, write['address'])
+                  if address_id == None:
+                    address_id = insert_account(cursor, write['address'], 7)
+                  else:
+                    update_account_type(cursor, address_id, 7)
+                  insert_contract(cursor, write['address'], tx['hash'], write['code'])
+                else:
+                  print('Error: deployed ca and the address mismatch')
+                  print('DeployedCA: {}, address: {}'.format(tx['deployedca'], write['address']))
+          
+          if run_account == True:
+            if write['code'] == None:
+              address_id = find_account_id(cursor, write['address'])
+              if address_id == None:
+                address_id = insert_account(cursor, write['address'], 6)
+              
+            #  exit()
+        if run_txtype == True:
+          update_tx(cursor, tx['hash'], tx['type'])
+        cnt_tx += 1
 
       unclecount = block.count('^')
 
@@ -162,79 +251,37 @@ def run(_from, _to):
         uncle_balance = uncle[2].split(':')[1]
         uncle_codehash = uncle[3].split(':')[1][2:]
         uncle_storageroot = uncle[4].split(':')[1][2:]
-        insert_uncle(cursor, blocknumber, uncle_address, uncle_nonce, uncle_balance, uncle_codehash, uncle_storageroot)
-        
+        uncle_address_id = find_account_id(cursor, uncle_address)
+        if uncle_address_id == None:
+          uncle_address_id = insert_account(cursor, uncle_address, 8)
+        #insert_uncle(cursor, blocknumber, uncle_address_id, uncle_nonce, uncle_balance, uncle_codehash, uncle_storageroot)
+        state_update = prepare_state(blocknumber, uncle_address_id, uncle_nonce, uncle_balance, uncle_codehash, uncle_storageroot, None, 3)
+        state_updates.append(state_update)
+        state_id += 1
 
-          for write in writelist:
-            write_vals = write.split('\n')
-            write_address = write_vals[0].split(':0x')[1].lower()
-            write_data =  {
-              'address': write_address,
-              'nonce': None,
-              'balance': None,
-              'codehash': None,
-              'code': None,
-              'storageroot': None,
-              'slotlogs': []
-            }
+      miner = block.split('$')[1].split('\n')[0:5]
+      miner_address = miner[0].split(':0x')[1].lower()
+      miner_nonce = miner[1].split(':')[1]
+      miner_balance = miner[2].split(':')[1]
+      miner_codehash = miner[3].split(':')[1][2:]
+      miner_storageroot = miner[4].split(':')[1][2:]
+      miner_address_id = find_account_id(cursor, miner_address)
+      if miner_address_id == None:
+        miner_address_id = insert_account(cursor, miner_address, 8)
+      state_update = prepare_state(blocknumber, miner_address_id, miner_nonce, miner_balance, miner_codehash, miner_storageroot, None, 1)
+      state_updates.append(state_update)
+      state_id += 1
 
-            writes.append(write_data)
-          elif txtype == 'Failed_transfer':
-            txclass = 1
-          elif txtype == 'Failed_contractdeploy':
-            txclass = 5
-          elif txtype == 'Failed_contractcall':
-            txclass = 7
-          elif txtype == 'ContractDeploy':
-            txclass = 4
-          elif txtype == 'ContractCall':
-            txclass = 6
-          
-          
-          
-      block_txs_sorted = sorted(block_txs_read, key=lambda x: x['index'])
-
-      for tx in block_txs_sorted:
-        if tx['type'] == 'Transfer':
-          type_value = 8
-        elif tx['type'][:6] == 'Failed':
-          type_value = 10
-        elif tx['type'] == 'ContractCall':
-          type_value = 12
-        elif tx['type'] == 'ContractDeploy':
-          type_value = 14
-          update_contract(cursor, deployedca, cacode)
-        else:
-          print(tx['type'])
-          exit()
-        update_tx(cursor, tx['hash'], tx['txclass'])
-        for read in tx['reads']:
-          account = find_account(cursor, read['address'])
-          if account == None:
-            insert_account(cursor, read['address'], blocknumber, 10)
-          insert_state(cursor, blocknumber, read['address'], None, None, None, None, tx['index'], type_value)
-          cnt_state += 1
-        for write in tx['writes']:
-          account = find_account(cursor, write['address'])
-          if account == None:
-            if write['code'] == None:
-              insert_account(cursor, write['address'], blocknumber, 4)
-            else:
-              insert_account(cursor, write['address'], blocknumber, 7)
-              insert_contract(cursor, write['address'], tx['hash'], write['code'])
-          elif account['_type'] == 0 or account['_type'] == 10 or account['_type'] == 11:
-            if write['code'] == None:
-              update_account_type(cursor, write['address'], 6)
-            else:
-              update_account_type(cursor, write['address'], 9)
-          insert_state(cursor, blocknumber, write['address'], write['nonce'], write['balance'], write['codehash'], write['storageroot'], tx['index'], type_value+1)
-          if len(write['slotlogs']) > 0:
-            state = get_latest_state(cursor)
-            for slot in write['slotlogs']:
-              insert_slot(cursor, state['id'], write['address'], slot['hash'], slot['value'])
+      if blocknumber % execute_interval == 0:
+        insert_state_batch(cursor, state_updates)
+        state_id = cursor.lastrowid
+        state_updates = []
+        insert_slot_batch(cursor, slots)
+        slots = []
       
-      if blocknumber % 2000 == 0:
+      if blocknumber % commit_interval == 0:
         conn.commit()
+      if blocknumber % log_interval == 0:
         seconds = time.time() - start
         print('#{}, Blkn: {}({:.2f}/s), Txn: {}({:.2f}/s), Staten: {}({:.2f}/s), Slotn: {}({:.2f}/s), Time: {}ms'.format(blocknumber, cnt_block, cnt_block/seconds, cnt_tx, cnt_tx/seconds, cnt_state, cnt_state/seconds, cnt_slot, cnt_slot/seconds, int(seconds*1000)))
     print('Indexed {}'.format(filename))
@@ -245,144 +292,84 @@ def get_latest_state(cursor):
   result = cursor.fetchone()
   return result
 
-def insert_slot(cursor, stateid, address, slot, slotvalue):
-  sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
-  cursor.execute(sql, (address,))
+def find_account_id(cursor, address):
+  if address in account_cache:
+    return account_cache[address]
+  address_bytes = bytes.fromhex(address)
+  sql = "SELECT * FROM `addresses` WHERE `address`=%s;"
+  cursor.execute(sql, (address_bytes,))
   result = cursor.fetchone()
   if result == None:
-    sql = "INSERT INTO `addresses` SET `address`=UNHEX(%s);"
-    cursor.execute(sql, (address,))
-    sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
-    cursor.execute(sql, (address,))
-    result = cursor.fetchone()
-  address_id = result['id']
+    return None
+  else:
+    result = result['id']
+  account_cache[address] = result
+  return result
 
-  sql = "SELECT * FROM `slots` WHERE `slot`=UNHEX(%s);"
-  cursor.execute(sql, (slot,))
+def find_slot_id(cursor, slot):
+  if slot in slot_cache:
+    return slot_cache[slot]
+  slot_bytes = bytes.fromhex(slot)
+  sql = "SELECT * FROM `slots` WHERE `slot`=%s;"
+  cursor.execute(sql, (slot_bytes,))
   result = cursor.fetchone()
   if result == None:
-    sql = "INSERT INTO `slots` SET `slot`=UNHEX(%s);"
-    cursor.execute(sql, (slot,))
-    sql = "SELECT * FROM `slots` WHERE `slot`=UNHEX(%s);"
-    cursor.execute(sql, (slot,))
-    result = cursor.fetchone()
-  slot_id = result['id']
+    sql = "INSERT INTO `slots` SET `slot`=%s;"
+    cursor.execute(sql, (slot_bytes,))
+    result = cursor.lastrowid
+  else:
+    result = result['id']
+  slot_cache[slot] = result
+  return result
 
-  sql = "INSERT INTO `slotlogs` (`stateid`, `address_id`, `slot_id`, `slotvalue`) VALUES (%s, %s, %s, UNHEX(%s));"
-  cursor.execute(sql, (stateid, address_id, slot_id, slotvalue))
+def insert_slot_batch(cursor, slots):
+  sql = "INSERT INTO `slotlogs` (`stateid`, `address_id`, `slot_id`, `slotvalue`) VALUES (%s, %s, %s, %s);"
+  cursor.executemany(sql, slots)
 
-def update_contract(cursor, address, code):
-  sql = "UPDATE `contracts` SET `code`=UNHEX(%s) WHERE `address`=UNHEX(%s);"
-  cursor.execute(sql, (code, address)) 
+def prepare_state(blocknumber, address_id, nonce, balance, codehash, storageroot, txindex, type_value):
+  if codehash == emptycodehash or codehash == None:
+    codehash = None
+  else:
+    codehash = bytes.fromhex(codehash)
+  if storageroot == emptystorageroot or storageroot == None:
+    storageroot = None
+  else:
+    storageroot = bytes.fromhex(storageroot)
+
+  return (blocknumber, type_value, txindex, address_id, nonce, balance, codehash, storageroot)
+
+def insert_state_batch(cursor, states):
+  sql = "INSERT INTO `states` (`blocknumber`, `type`, `txindex`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);"
+  cursor.executemany(sql, states)
 
 def update_tx(cursor, txhash, txclass):
-  sql = "UPDATE `transactions` SET `class`=%s WHERE `hash`=UNHEX(%s);"
+  txhash = bytes.fromhex(txhash)
+  sql = "UPDATE `transactions` SET `class`=%s WHERE `hash`=%s;"
   cursor.execute(sql, (txclass, txhash))
 
-def update_account_type(cursor, address, type):
-  sql = "UPDATE `accounts` SET `_type`=%s WHERE `address`=UNHEX(%s);"
-  cursor.execute(sql, (type, address))
-
-def insert_state(cursor, blocknumber, address, nonce, balance, codehash, storageroot, txindex, type_value):
-  sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
-  cursor.execute(sql, (address,))
-  result = cursor.fetchone()
-  if result == None:
-    sql = "INSERT INTO `addresses` SET `address`=UNHEX(%s);"
-    cursor.execute(sql, (address,))
-    sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
-    cursor.execute(sql, (address,))
-    result = cursor.fetchone()
-  address_id = result['id']
-
-  if codehash == emptycodehash and storageroot == emptystorageroot:
-    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`, `txindex`) VALUES (%s, %s, %s, %s, %s, NULL, NULL, %s);"
-    cursor.execute(sql, (blocknumber, type_value, address_id, nonce, balance, txindex))
-  elif codehash == emptycodehash:
-    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`, `txindex`) VALUES (%s, %s, %s, %s, %s, NULL, UNHEX(%s), %s);"
-    cursor.execute(sql, (blocknumber, type_value, address_id, nonce, balance, storageroot, txindex))
-  elif storageroot == emptystorageroot:
-    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`, `txindex`) VALUES (%s, %s, %s, %s, %s, UNHEX(%s), NULL, %s);"
-    cursor.execute(sql, (blocknumber, type_value, address_id, nonce, balance, codehash, txindex))
-  else:
-    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`, `txindex`) VALUES (%s, %s, %s, %s, %s, UNHEX(%s), UNHEX(%s), %s);"
-    cursor.execute(sql, (blocknumber, type_value, address_id, nonce, balance, codehash, storageroot, txindex))
-
-def insert_miner(cursor, blocknumber, address, nonce, balance, codehash, storageroot):
-  sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
-  cursor.execute(sql, (address,))
-  result = cursor.fetchone()
-  if result == None:
-    sql = "INSERT INTO `addresses` SET `address`=UNHEX(%s);"
-    cursor.execute(sql, (address,))
-    sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
-    cursor.execute(sql, (address,))
-    result = cursor.fetchone()
-  address_id = result['id']
-
-  if codehash == emptycodehash and storageroot == emptystorageroot:
-    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, NULL, NULL);"
-    cursor.execute(sql, (blocknumber, 1, address_id, nonce, balance))
-  elif codehash == emptycodehash:
-    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, NULL, UNHEX(%s));"
-    cursor.execute(sql, (blocknumber, 1, address_id, nonce, balance, storageroot))
-  elif storageroot == emptystorageroot:
-    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s), %s, %s, UNHEX(%s), NULL);"
-    cursor.execute(sql, (blocknumber, 1, address_id, nonce, balance, codehash))
-  else:
-    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, UNHEX(%s), UNHEX(%s));"
-    cursor.execute(sql, (blocknumber, 1, address_id, nonce, balance, codehash, storageroot))
-
-def insert_uncle(cursor, blocknumber, address, nonce, balance, codehash, storageroot):
-  sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
-  cursor.execute(sql, (address,))
-  result = cursor.fetchone()
-  if result == None:
-    sql = "INSERT INTO `addresses` SET `address`=UNHEX(%s);"
-    cursor.execute(sql, (address,))
-    sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
-    cursor.execute(sql, (address,))
-    result = cursor.fetchone()
-  address_id = result['id']
-
-  if codehash == emptycodehash and storageroot == emptystorageroot:
-    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, NULL, NULL);"
-    cursor.execute(sql, (blocknumber, 3, address_id, nonce, balance))
-  elif codehash == emptycodehash:
-    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, NULL, UNHEX(%s));"
-    cursor.execute(sql, (blocknumber, 3, address_id, nonce, balance, storageroot))
-  elif storageroot == emptystorageroot:
-    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, UNHEX(%s), NULL);"
-    cursor.execute(sql, (blocknumber, 3, address_id, nonce, balance, codehash))
-  else:
-    sql = "INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, UNHEX(%s), UNHEX(%s);"
-    cursor.execute(sql, (blocknumber, 3, address_id, nonce, balance, codehash, storageroot))
-  
-
-def insert_account(cursor, address, blocknumber, type):
-  sql = "INSERT INTO `accounts` (`address`, `txn`, `sent`, `received`, `contract`, `firsttx`, `lasttx`, `minedblockn`, `minedunclen`, `_type`) VALUES (UNHEX(%s), %s, %s, %s, %s, %s, %s, %s, %s, %s);"
-  cursor.execute(sql, (address, 0, 0, 0, 0, blocknumber, blocknumber, 0, 0, type))
+def insert_account(cursor, address, type):
+  address = bytes.fromhex(address)
+  sql = "INSERT INTO `addresses` (`address`, `_type`) VALUES (%s, %s);"
+  cursor.execute(sql, (address, type))
+  account_cache[address] = cursor.lastrowid
+  return cursor.lastrowid
 
 def insert_contract(cursor, address, creationtx, code):
-  sql = "INSERT INTO `contracts` (`address`, `creationtx`, `code`) VALUES (UNHEX(%s), UNHEX(%s), UNHEX(%s));"
-  cursor.execute(sql, (address, creationtx, code))
+  address = bytes.fromhex(address)
+  creationtx = bytes.fromhex(creationtx)
+  code = bytes.fromhex(code)
+  sql = "INSERT INTO `contracts` (`address`, `creationtx`, `code`) VALUES (%s, %s, %s);"
+  try:
+    cursor.execute(sql, (address, creationtx, code))
+  except pymysql.err.IntegrityError:
+    update_contract(cursor, address, creationtx, code)
 
-def select_txs(cursor, blocknumber):
-  sql = "SELECT * FROM `transactions` WHERE `blocknumber`=%s;"
-  cursor.execute(sql, (blocknumber,))
-  result = cursor.fetchall()
-  return result
+def update_contract(cursor, address, creationtx, code):
+  sql = "UPDATE `contracts` SET `code`=%s, `creationtx`=%s WHERE `address`=%s;"
+  cursor.execute(sql, (code, creationtx, address)) 
 
-def select_tx(cursor, txhash):
-  sql = "SELECT * FROM `transactions` WHERE `hash`=UNHEX(%s);"
-  cursor.execute(sql, (txhash,))
-  result = cursor.fetchone()
-  return result
-  
-def find_account(cursor, address):
-  sql = "SELECT * FROM `accounts` WHERE `address`=UNHEX(%s);"
-  cursor.execute(sql, (address,))
-  result = cursor.fetchone()
-  return result
+def update_account_type(cursor, address_id, type):
+  sql = "UPDATE `addresses` SET `_type`=%s WHERE `id`=%s;"
+  cursor.execute(sql, (type, address_id))
 
 run(start_block, end_block)
