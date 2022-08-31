@@ -62,7 +62,7 @@ CREATE TABLE `slotlogs` (
   `stateid` bigint(20) NOT NULL,
   `address_id` int(11) NOT NULL,
   `slot_id` int(11) NOT NULL,
-  `slotvalue` varbinary(64) NOT NULL
+  `slotvalue` varbinary(64) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=ascii;
 
 CREATE TABLE `slots` (
