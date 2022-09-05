@@ -59,6 +59,7 @@ run_txtype = False
 #19: write by failed contract deploy tx
 
 #31: initial alloc
+#33: Hard fork
 
 #63: kill account
 
@@ -104,7 +105,7 @@ def run(_from, _to):
   state_updates = []
   slots = []
 
-  _from = _from // interval * interval+1
+  _from = (_from-1) // interval * interval+1
   for blockheight in range(_from, _to, interval):
     filename = os.path.join(datadir, 'TxSubstate{:08}-{:08}.txt'.format(blockheight, blockheight+interval-1))
     f = open(filename, 'r')
@@ -116,9 +117,18 @@ def run(_from, _to):
       cnt_block += 1
 
       txcount = block.count('!')
-      for i in range(1, txcount+1):
+
+      if '*' in block:
+        start = 0 #hard fork
+      else:
+        start = 1
+      for i in range(start, txcount+1):
         txbody = block.split('!')[i]
-        txdata = txbody.split('@')[0].split('\n')[:-1]
+        if i == 0:
+          state_type = 33
+          txdata = []
+        else:
+          txdata = txbody.split('@')[0].split('\n')[:-1]
         tx = {
           'index': i-1,
           'hash': None,
@@ -162,7 +172,7 @@ def run(_from, _to):
             tx['deployedca'] = v[2:]
         readlist = txbody.split('@')[1].split('#')[0].split('\n')[1:-1]
         for j in readlist:
-          address = j.split(':')[1][2:].lower()
+          address = j.split(':')[1][2:]
           if run_state == True:
             address_id = find_account_id(cursor, address)
             if address_id == None:
@@ -276,7 +286,7 @@ def run(_from, _to):
                 address_id = insert_account(cursor, write['address'], 6)
               
             #  exit()
-        if run_txtype == True:
+        if run_txtype == True and i != 0:
           update_tx(cursor, tx['hash'], tx['type'])
         cnt_tx += 1
 
