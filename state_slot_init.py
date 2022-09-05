@@ -14,6 +14,13 @@ alloc = json.loads(f.read())['alloc']
 conn = conn_mariadb(db_host, db_user, db_pass, db_name)
 cursor = conn.cursor()
 
+cursor.execute("TRUNCATE `addresses`;")
+cursor.execute("TRUNCATE `contracts`;")
+cursor.execute("TRUNCATE `slotlogs`;")
+cursor.execute("TRUNCATE `slots`;")
+cursor.execute("TRUNCATE `states`;")
+conn.commit()
+
 for account, balance in alloc.items():
   address = account[2:]
 
