@@ -10,7 +10,8 @@ const db_user = 'ethereum';
 const db_pass = '';
 const db_name = 'ethereum';
 
-let epoch = 40320;
+let epoch_inactivate_every = 40320;
+let epoch_inactivate_older_than = 40320;
 let block_start = 1;
 let block_end = 100000;
 let output_restore = 'restore.json';
@@ -51,7 +52,8 @@ if (args.length >= 3) {
   block_end = parseInt(args[3]);
 }
 if (args.length >= 4) {
-  epoch = parseInt(args[4]);
+  epoch_inactivate_every = parseInt(args[4]);
+  epoch_inactivate_older_than = parseInt(args[4]);
 }
 if (args.length >= 5) {
   output_restore = args[5];
@@ -85,9 +87,9 @@ async function run(from, to) {
     cache_block[i] = cache_block_tmp;
 
     //simulate inactivation
-    if ((i + 1 - from) % epoch == 0) {
-      for (let j = 0; j < epoch; j++) {
-        let block_removal = i - j - epoch;
+    if ((i + 1 - from) % epoch_inactivate_every == 0) {
+      for (let j = 0; j < epoch_inactivate_every; j++) {
+        let block_removal = i - j - epoch_inactivate_older_than;
         if (block_removal in cache_block) {
           for (let j in cache_block[block_removal]) {
             if (cache_account[j] == block_removal) {
