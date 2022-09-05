@@ -29,6 +29,7 @@ interval = args.interval
 
 datadir = args.datadir
 
+block_skip = 0
 
 conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host, user=user, password=password, database=database, cursorclass=pymysql.cursors.DictCursor)
 
@@ -82,6 +83,7 @@ run_txtype = False
 #type 8: Uncertain (EoA or CA, first appears as block or uncle miner)
 #type 9: CA (null or not null), Deployed from CA
 #type 10: Uncertain (EoA or CA, presale)
+#type 11: Uncertain (EoA or CA, not exist but delete requested)
 
 slot_cache = {}
 account_cache = {}
@@ -101,12 +103,16 @@ def run(_from, _to):
     state_id = latest_state['id']
   state_updates = []
   slots = []
+
+  _from = _from // interval * interval+1
   for blockheight in range(_from, _to, interval):
-    filename = 'txsubstate/TxSubstate{:08}-{:08}.txt'.format(blockheight, blockheight+interval-1)
+    filename = os.path.join(datadir, 'TxSubstate{:08}-{:08}.txt'.format(blockheight, blockheight+interval-1))
     f = open(filename, 'r')
     blocks = f.read().split('/')[1:]
     for block in blocks:
       blocknumber = int(block.split('\n')[0].split(':')[1])
+      if blocknumber < start_block:
+        continue
       cnt_block += 1
 
       txcount = block.count('!')
@@ -211,6 +217,8 @@ def run(_from, _to):
             address_id = find_account_id(cursor, write['address'])
 
             if write['delete'] == True:
+              if address_id == None:
+                address_id = insert_account(cursor, write['address'], 11)
               state_update = prepare_state(blocknumber, address_id, None, None, None, None, tx['index'], 63)
               state_updates.append(state_update)
               state_id += 1
@@ -372,7 +380,11 @@ def insert_state_batch(cursor, states):
     sql = "INSERT INTO `states` (`blocknumber`, `type`, `txindex`, `address_id`, `nonce`, `balance`, `codehash`, `storageroot`) VALUES (%s, %s, %s, %s, %s, %s, %s, %s);"
     cursor.executemany(sql, states)
   except pymysql.err.DataError:
-    print(states)
+    print('DataError at block #{}'.format(states[0][0]))
+    exit()
+  except pymysql.err.IntegrityError:
+    print('IntegrityError at block #{}'.format(states[0][0]))
+    exit()
 
 def update_tx(cursor, txhash, txclass):
   txhash = bytes.fromhex(txhash)
@@ -397,7 +409,7 @@ def insert_contract(cursor, address, creationtx, code):
     update_contract(cursor, address, creationtx, code)
 
 def update_contract(cursor, address, creationtx, code):
-  print('Contract updated: {}'.format(address.hex()))
+  #print('Contract updated: {}'.format(address.hex()))
   sql = "UPDATE `contracts` SET `code`=%s, `creationtx`=%s WHERE `address`=%s;"
   cursor.execute(sql, (code, creationtx, address)) 
 
