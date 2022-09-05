@@ -8,6 +8,8 @@ const db_name = 'ethereum';
 
 let cnt_block = 0, cnt_tx = 0;
 let running = false;
+const query_size = 200;
+let totalaccounts = 0;
 
 let start = new Date();
 
@@ -30,13 +32,13 @@ let cache = {};
 let conn = null;
 
 async function run(from, to) {
-  conn = await mysql.createConnection({host: db_host, user: db_user, password: db_pass, database: db_name});
+  conn = await mysql.createConnection({host: db_host, user: db_user, password: db_pass, database: db_name, multipleStatements: true});
   await conn.connect();
   const batchsize = 100;
-  const commit_period = 1000;
-  const log_period = 1000;
+  const commit_period = 20000;
+  const log_period = 2000;
   for (let i = from; i < to; i+=batchsize) {
-    let query = await mysql_query(conn, "SELECT `blocknumber`, `hash`, `input`, `from`, `to` FROM `transactions` WHERE `blocknumber`>=? AND `blocknumber`<?;", [i, i+batchsize]);
+    let query = await mysql_query(conn, "SELECT `blocknumber`, `from`, `to` FROM `transactions` WHERE `blocknumber`>=? AND `blocknumber`<?;", [i, i+batchsize]);
     cnt_block+=batchsize;
     if (query.length !== 0) {
       for (let j = 0; j < query.length; j++) {
@@ -63,7 +65,7 @@ async function run(from, to) {
       let ms = new Date() - start;
       console.error('Blk height: %d, Blkn: %d(%d/s), Txn: %d(%d/s), Time: %dms', i, cnt_block, (cnt_block/ms*1000).toFixed(2), cnt_tx, (cnt_tx/ms*1000).toFixed(2), ms);
     }
-    if (i % commit_period === 0) {
+    if (i % commit_period === 0 && Object.keys(cache).length !== 0) {
       await flush_accounts();
     }
   }
@@ -85,7 +87,6 @@ async function add_account_tx (address, blocknumber, type) {
         contract: query[0].contract,
         firsttx: query[0].firsttx,
         lasttx: query[0].lasttx,
-        balance: query[0].balance,
         minedblockn: query[0].minedblockn,
         minedunclen: query[0].minedunclen,
         _type: query[0]._type,
@@ -99,7 +100,6 @@ async function add_account_tx (address, blocknumber, type) {
         contract: 0,
         firsttx: blocknumber,
         lasttx: blocknumber,
-        balance: null,
         minedblockn: 0,
         minedunclen: 0,
         _type: 0,
@@ -129,12 +129,21 @@ async function add_account_tx (address, blocknumber, type) {
 async function flush_accounts () {
   let cnt = 0;
   await conn.beginTransaction();
+  let accounts_insert = [];
+  let accounts_update = [];
   for (let i in cache) {
-    insert_account_batch(cache[i].id, i, cache[i].txn, cache[i].sent, cache[i].received, cache[i].contract, cache[i].firsttx, cache[i].lasttx, cache[i].balance, cache[i].minedblockn, cache[i].minedunclen, cache[i]._type);
+    if (cache[i].id === null) {
+      let address = Buffer.from(i, 'hex');
+      accounts_insert.push([address, cache[i].txn, cache[i].sent, cache[i].received, cache[i].contract, cache[i].firsttx, cache[i].lasttx, cache[i].minedblockn, cache[i].minedunclen, cache[i]._type]);
+    } else {
+      accounts_update.push(cache[i].txn, cache[i].sent, cache[i].received, cache[i].contract, cache[i].firsttx, cache[i].lasttx, cache[i].id);
+    }
     cnt++;
   }
+  if (accounts_insert.length > 0) await insert_account_many(accounts_insert);
+  if (accounts_update.length > 0) await update_account_many(accounts_update);
   try {
-    console.log('Commiting %d accounts...', cnt);
+    console.error('Commiting %d accounts...', cnt);
     await conn.commit();
     cache = {};
   } catch (err) {
@@ -148,20 +157,32 @@ async function flush_accounts () {
   }
 }
 
-async function insert_account_batch (id, address, txn, sent, received, contract, firsttx, lasttx, balance, minedblockn, minedunclen, _type) {
+async function insert_account_many (accounts) {
   try {
-    if (id === null) {
-      let addr = Buffer.from(address, 'hex');
-      mysql_query(conn, "INSERT INTO `accounts` (`address`, `txn`, `sent`, `received`, `contract`, `firsttx`, `lasttx`, `balance`, `minedblockn`, `minedunclen`, `_type`) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", [addr, txn, sent, received, contract, firsttx, lasttx, balance, minedblockn, minedunclen, _type]);
-    } else {
-      mysql_query(conn, "UPDATE `accounts` SET `txn`=?, `sent`=?, `received`=?, `contract`=?, `firsttx`=?, `lasttx`=? WHERE `id`=?;", [txn, sent, received, contract, firsttx, lasttx, id]);
+    totalaccounts += accounts.length;
+    console.error('Insert %d accounts (%d total)', accounts.length, totalaccounts);
+    for (let i = 0; i < accounts.length; i+=query_size) {
+      await mysql_query(conn, "INSERT INTO `accounts` (`address`, `txn`, `sent`, `received`, `contract`, `firsttx`, `lasttx`, `minedblockn`, `minedunclen`, `_type`) VALUES ?", [accounts.slice(i, i+query_size)]);
     }
   } catch (err) {
     console.log(err);
-    let addr = Buffer.from(address, 'hex');
-    console.log('Error insertion address ', addr);
+    console.log('Error');
   }
 }
 
+async function update_account_many (accounts) {
+  try {
+    console.error('Update %d accounts', accounts.length/7);
+    for (let i = 0; i < accounts.length; i+=query_size*7) {
+      let query = "UPDATE `accounts` SET `txn`=?, `sent`=?, `received`=?, `contract`=?, `firsttx`=?, `lasttx`=? WHERE `id`=?;";
+      let update = accounts.slice(i, i+query_size*7)
+      query = query.repeat(update.length/7);
+      await mysql_query(conn, query, update);
+    }
+  } catch (err) {
+    console.log(err);
+    console.log('Error');
+  }
+}
 
 run(0, 15000000);
