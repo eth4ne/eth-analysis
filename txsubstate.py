@@ -59,7 +59,8 @@ run_txtype = False
 #19: write by failed contract deploy tx
 
 #31: initial alloc
-#33: Hard fork
+#32: read on hard fork
+#33: write on hard fork
 
 #63: kill account
 
@@ -185,7 +186,7 @@ def run(_from, _to):
         writelist = txbody.split('#')[1].split('$')[0].split('.')[1:]
         for j in writelist:
           write_data = j.split('\n')[:-1]
-          write =  {
+          write = {
             'address': None,
             'nonce': None,
             'balance': None,
