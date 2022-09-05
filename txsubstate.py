@@ -1,19 +1,34 @@
 import pymysql.cursors
 import pymysql.err
 import time
+import argparse
+import os
 
 db_host = 'localhost'
 db_user = 'ethereum'
 db_pass = '' #fill in the MariaDB/MySQL password.
 db_name = 'ethereum'
 
-start_block = 1
-end_block = 1000000
-interval = 100000
+parser = argparse.ArgumentParser(description='TxSubstate parser')
+parser.add_argument('-s', '--start', type=int, default=1, help='block to start from')
+parser.add_argument('-e', '--end', type=int, default=4000000, help='block to stop running')
+parser.add_argument('-i', '--interval', type=int, default=100000, help='number of blocks in each substate file')
+parser.add_argument('-c', '--commit-interval', type=int, default=1000, help='commit DB for every N blocks')
+parser.add_argument('-l', '--log-interval', type=int, default=1000, help='print log for every N blocks')
+parser.add_argument('-x', '--execute-interval', type=int, default=1000, help='accumulate DB queries for N blocks before executing')
+parser.add_argument('-d', '--datadir', type=str, default='txsubstate', help='data directory to read from')
+args = parser.parse_args()
 
-commit_interval = 2000
-log_interval = 2000
-execute_interval = 2000
+commit_interval = args.commit_interval
+log_interval = args.log_interval
+execute_interval = args.execute_interval
+
+start_block = args.start
+end_block = args.end
+interval = args.interval
+
+datadir = args.datadir
+
 
 conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host, user=user, password=password, database=database, cursorclass=pymysql.cursors.DictCursor)
 
