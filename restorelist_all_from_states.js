@@ -2,6 +2,7 @@
 
 const mysql = require('mysql');
 const fs = require('fs');
+const process = require('process');
 
 const db_host = 'localhost';
 
@@ -9,10 +10,10 @@ const db_user = 'ethereum';
 const db_pass = '';
 const db_name = 'ethereum';
 
-const epoch = 40320;
-const block_start = 1;
-const block_end = 1000000;
-const output_restore = 'restore.json';
+let epoch = 40320;
+let block_start = 1;
+let block_end = 100000;
+let output_restore = 'restore.json';
 
 const log_period = 1000;
 
@@ -42,12 +43,26 @@ let restore = {};
 
 let conn = null;
 
+let args = process.argv;
+if (args.length >= 2) {
+  block_start = parseInt(args[2]);
+}
+if (args.length >= 3) {
+  block_end = parseInt(args[3]);
+}
+if (args.length >= 4) {
+  epoch = parseInt(args[4]);
+}
+if (args.length >= 5) {
+  output_restore = args[5];
+}
+
 async function run(from, to) {
   conn = await mysql.createConnection({host: db_host, user: db_user, password: db_pass, database: db_name});
   await conn.connect();
   for (let i = from; i <= to; i+=1) {
     //read, write
-    let query = await mysql_query(conn, "SELECT `address` FROM `states` LEFT JOIN `addresses` ON `states`.`address_id`=`addresses`.`id` WHERE `blocknumber`=?;", [i]);
+    let query = await mysql_query(conn, "SELECT `address`, `blocknumber`, `type` FROM `states` LEFT JOIN `addresses` ON `states`.`address_id`=`addresses`.`id` WHERE `blocknumber`=?;", [i]);
     let cache_block_tmp = {};
     cnt_block+=1;
     if (query.length !== 0) {
@@ -90,8 +105,10 @@ async function run(from, to) {
   }
   conn.end();
 
-  let restore_json = JSON.stringify(restore, null, "");
+  let restore_json = JSON.stringify(restore, null, "  ");
   fs.writeFileSync(output_restore, restore_json);
+
+  console.error('Saved result as ' + output_restore);
 
   running = false;
 }
@@ -105,6 +122,7 @@ async function update_account (address, blocknumber, type) {
       } else {
         restore[blocknumber] = ['0x'+address];
       }
+      cache_account[address] = blocknumber;
     }
   } else if (type == 1) { //write
     if (address in cache_account && cache_account[address] < 0) {
