@@ -1,4 +1,5 @@
 const mysql = require('mysql');
+const { exit } = require('process');
 
 const db_host = 'localhost';
 
