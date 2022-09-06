@@ -2,7 +2,9 @@
 
 const mysql = require('mysql');
 const fs = require('fs');
-const process = require('process');
+const { ArgumentParser } = require('argparse');
+
+const parser = new ArgumentParser({ description: 'Restore list generator' })
 
 const db_host = 'localhost';
 
@@ -44,20 +46,20 @@ let restore = {};
 
 let conn = null;
 
-let args = process.argv;
-if (args.length >= 2) {
-  block_start = parseInt(args[2]);
-}
-if (args.length >= 3) {
-  block_end = parseInt(args[3]);
-}
-if (args.length >= 4) {
-  epoch_inactivate_every = parseInt(args[4]);
-  epoch_inactivate_older_than = parseInt(args[4]);
-}
-if (args.length >= 5) {
-  output_restore = args[5];
-}
+parser.add_argument('-s', '--start', {metavar: 'N', type: 'int', nargs: '?', default: 1, help: 'block height to start (inclusive)'})
+parser.add_argument('-e', '--end', {metavar: 'N', type: 'int', nargs: '?', default: 1000000, help: 'block height to end (inclusive)'})
+parser.add_argument('-i', '--inactivate-every', {metavar: 'N', type: 'int', nargs: '?', default: 100000, help: 'run inactivation every N blocks'})
+parser.add_argument('-t', '--inactivate-older-than', {metavar: 'N', type: 'int', nargs: '?', default: 100000, help: 'inactivate addresses older than N blocks'})
+parser.add_argument('-o', '--output-filename', {metavar: 'output.json', type: 'str', nargs: '?', default: 'output.json', help: 'output to file'})
+parser.add_argument('-l', '--log-every', {metavar: 'output.json', type: 'int', nargs: '?', default: 1000, help: 'print log every N blocks'})
+
+let args = parser.parse_args();
+
+block_start = args.start;
+block_end = args.end;
+epoch_inactivate_every = args.inactivate_every;
+epoch_inactivate_older_than = args.epoch_inactivate_older_than;
+output_restore = args.output_filename;
 
 async function run(from, to) {
   conn = await mysql.createConnection({host: db_host, user: db_user, password: db_pass, database: db_name});
