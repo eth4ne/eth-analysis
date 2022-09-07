@@ -17,8 +17,7 @@ let epoch_inactivate_older_than = 40320;
 let block_start = 1;
 let block_end = 100000;
 let output_restore = 'restore.json';
-
-const log_period = 1000;
+let log_period = 10000;
 
 let cnt_block = 0, cnt_state = 0;
 
@@ -51,7 +50,7 @@ parser.add_argument('-e', '--end', {metavar: 'N', type: 'int', nargs: '?', defau
 parser.add_argument('-i', '--inactivate-every', {metavar: 'N', type: 'int', nargs: '?', default: 100000, help: 'run inactivation every N blocks'})
 parser.add_argument('-t', '--inactivate-older-than', {metavar: 'N', type: 'int', nargs: '?', default: 100000, help: 'inactivate addresses older than N blocks'})
 parser.add_argument('-o', '--output-filename', {metavar: 'output.json', type: 'str', nargs: '?', default: 'output.json', help: 'output to file'})
-parser.add_argument('-l', '--log-every', {metavar: 'output.json', type: 'int', nargs: '?', default: 1000, help: 'print log every N blocks'})
+parser.add_argument('-l', '--log-every', {metavar: 'output.json', type: 'int', nargs: '?', default: 10000, help: 'print log every N blocks'})
 
 let args = parser.parse_args();
 
@@ -60,6 +59,7 @@ block_end = args.end;
 epoch_inactivate_every = args.inactivate_every;
 epoch_inactivate_older_than = args.epoch_inactivate_older_than;
 output_restore = args.output_filename;
+log_period = args.log_every;
 
 async function run(from, to) {
   conn = await mysql.createConnection({host: db_host, user: db_user, password: db_pass, database: db_name});
