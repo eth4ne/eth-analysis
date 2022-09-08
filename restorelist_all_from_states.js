@@ -75,6 +75,8 @@ async function run(from, to) {
     for (let j = 0; j < query.length; ++j) {
       result[query[j].blocknumber-i].push(query[j]);
     }
+    query = null;
+    if (global.gc) global.gc();
     for (let k = 0; k < batch_size; ++k) {
       let cache_block_tmp = {};
       for (let j in result[k]) {
