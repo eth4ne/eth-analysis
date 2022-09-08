@@ -99,10 +99,10 @@ async function run(from, to) {
       if ((i+k + 1 - from) % epoch_inactivate_every == 0) {
         for (let j = 0; j < epoch_inactivate_every; ++j) {
           let block_removal = i+k - j - epoch_inactivate_older_than;
-          if ((''+block_removal) in cache_block) {
-            for (let j in cache_block[block_removal]) {
-              if (cache_account[j] == ''+block_removal) {
-                cache_account[j] = -block_removal;
+          if ((block_removal) in cache_block) {
+            for (let l in cache_block[block_removal]) {
+              if (cache_account[l] == block_removal) {
+                cache_account[l] = -block_removal;
               }
             }
             delete cache_block.block_removal;
