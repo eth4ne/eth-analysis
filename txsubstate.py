@@ -228,13 +228,15 @@ def run(_from, _to):
           if run_state == True:        
             address_id = find_account_id(cursor, write['address'])
 
-            if write['delete'] == True:
+            if write['delete'] == True and tx['type'] != 7:
               if address_id == None:
                 address_id = insert_account(cursor, write['address'], 11)
               state_update = prepare_state(blocknumber, address_id, None, None, None, None, tx['index'], 63)
               state_updates.append(state_update)
               state_id += 1
-
+            elif write['delete'] == True:
+              #delete miner in failed contract call
+              pass
             else:
               if address_id == None:
                 if write['code'] == None:
