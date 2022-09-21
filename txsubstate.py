@@ -120,16 +120,11 @@ def run(_from, _to):
       txcount = block.count('!')
 
       if '*' in block:
-        start = 0 #hard fork
+        txstart = 0 #hard fork
       else:
-        start = 1
-      for i in range(start, txcount+1):
+        txstart = 1
+      for i in range(txstart, txcount+1):
         txbody = block.split('!')[i]
-        if i == 0:
-          state_type = 33
-          txdata = []
-        else:
-          txdata = txbody.split('@')[0].split('\n')[:-1]
         tx = {
           'index': i-1,
           'hash': None,
@@ -138,6 +133,12 @@ def run(_from, _to):
           'to': None,
           'deployedca': None,
         }
+        if i == 0:
+          state_type = 33
+          tx['index'] = None
+          txdata = []
+        else:
+          txdata = txbody.split('@')[0].split('\n')[:-1]
         for j in txdata:
           k = j.split(':')[0]
           v = j.split(':')[1]
