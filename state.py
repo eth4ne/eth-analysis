@@ -225,7 +225,7 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
       state_updates.append(state_update)
       state_id += 1
 
-    return state_updates
+  return state_updates
 
 def prepare_state(state_id, blocknumber, address, nonce, balance, codehash, storageroot, txindex, type_value):
   emptycodehash = 'pty'
