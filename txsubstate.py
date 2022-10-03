@@ -106,6 +106,7 @@ def run(_from, _to):
   state_updates = []
   slots = []
 
+  _from_ = _from
   _from = (_from-1) // interval * interval+1
   for blockheight in range(_from, _to, interval):
     filename = os.path.join(datadir, 'TxSubstate{:08}-{:08}.txt'.format(blockheight, blockheight+interval-1))
@@ -113,8 +114,10 @@ def run(_from, _to):
     blocks = f.read().split('/')[1:]
     for block in blocks:
       blocknumber = int(block.split('\n')[0].split(':')[1])
-      if blocknumber < start_block:
+      if blocknumber < _from_:
         continue
+      if blocknumber > _to:
+        break
       cnt_block += 1
 
       txcount = block.count('!')
