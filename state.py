@@ -49,6 +49,7 @@ import os
 def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
   state_updates = []
   contract_updates = []
+  slot_updates = []
   cnt_block = 0
   cnt_state = 0
   cnt_slot = 0
@@ -140,7 +141,6 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
             'deployedbyca': False,
             'delete': False,
             'storageroot': None,
-            'slotlogs': []
           }
           for ij in write_data:
             k = ij.split(':')[0]
@@ -171,14 +171,12 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
                 slot['value'] = None
               else:
                 slot['value'] = bytes.fromhex(slot['value'])
-              write['slotlogs'].append(slot) 
+              slot_updates.append(slot)
     
           address = write['address']
 
           if write['delete'] == True and tx['type'] != 7:
             state_update = prepare_state(state_id, blocknumber, address, None, None, None, None, tx['index'], 63)
-            if len(write['slotlogs']) > 0:
-              state_update['slots'] = write['slotlogs']
             state_updates.append(state_update)
             state_id += 1
           elif write['delete'] == True:
@@ -186,8 +184,6 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
             pass
           else:
             state_update = prepare_state(state_id, blocknumber, address, write['nonce'], write['balance'], write['codehash'], write['storageroot'], tx['index'], state_type+1)
-            if len(write['slotlogs']) > 0:
-              state_update['slots'] = write['slotlogs']
             state_updates.append(state_update)
             state_id += 1
         
@@ -225,7 +221,7 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
       state_updates.append(state_update)
       state_id += 1
 
-  return state_updates
+  return state_updates, slot_updates
 
 def prepare_state(state_id, blocknumber, address, nonce, balance, codehash, storageroot, txindex, type_value):
   emptycodehash = 'pty'
