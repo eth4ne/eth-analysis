@@ -47,15 +47,16 @@ import os
 
 
 def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
-  state_updates = []
-  contract_updates = []
-  slot_updates = []
+  state_updates = {}
+  contract_updates = {}
+  slot_updates = {}
   cnt_block = 0
   cnt_state = 0
   cnt_slot = 0
   cnt_tx = 0
   state_id = 0
 
+  _from_ = _from
   _from = (_from-1) // interval * interval+1
   for blockheight in range(_from, _to, interval):
     filename = os.path.join(datadir, 'TxSubstate{:08}-{:08}.txt'.format(blockheight, blockheight+interval-1))
@@ -63,9 +64,14 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
     blocks = f.read().split('/')[1:]
     for block in blocks:
       blocknumber = int(block.split('\n')[0].split(':')[1])
-      if blocknumber < _from:
+      if blocknumber < _from_:
         continue
+      if blocknumber >= _to:
+        break
       cnt_block += 1
+      block_states = []
+      block_slots = []
+      block_contracts = []
 
       txcount = block.count('!')
 
@@ -126,7 +132,7 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
         for j in readlist:
           address = j.split(':')[1][2:]
           state_update = prepare_state(state_id, blocknumber, address, None, None, None, None, tx['index'], state_type)
-          state_updates.append(state_update)
+          block_states.append(state_update)
           state_id += 1
             
         writelist = txbody.split('#')[1].split('$')[0].split('.')[1:]
@@ -180,8 +186,8 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
             state_update = prepare_state(state_id, blocknumber, address, None, None, None, None, tx['index'], 63)
             for slot in slots:
               slot['address'] = address
-              slot_updates.append(slot)
-            state_updates.append(state_update)
+              block_slots.append(slot)
+            block_states.append(state_update)
             state_id += 1
           elif write['delete'] == True:
             #delete miner in failed contract call
@@ -190,15 +196,15 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
             state_update = prepare_state(state_id, blocknumber, address, write['nonce'], write['balance'], write['codehash'], write['storageroot'], tx['index'], state_type+1)
             for slot in slots:
               slot['address'] = address
-              slot_updates.append(slot)
-            state_updates.append(state_update)
+              block_slots.append(slot)
+            block_states.append(state_update)
             state_id += 1
         
           cnt_state += 1
 
           if write['code'] != None:
             if write['deployedbyca'] == True:
-              contract_updates.append({'address': write['address'], 'txhash': tx['hash'], 'code': write['code']})
+              block_contracts.append({'address': write['address'], 'txhash': tx['hash'], 'code': write['code']})
           
         cnt_tx += 1
 
@@ -207,26 +213,29 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
       for i in range(1, unclecount+1):
         uncle = block.split('^')[i].split('\n')[0:5]
         uncle_address = uncle[0].split(':0x')[1].lower()
-        uncle_nonce = uncle[1].split(':')[1]
-        uncle_balance = uncle[2].split(':')[1]
+        uncle_nonce = int(uncle[1].split(':')[1])
+        uncle_balance = int(uncle[2].split(':')[1])
         uncle_codehash = uncle[3].split(':')[1][2:]
         uncle_storageroot = uncle[4].split(':')[1][2:]
 
-        #insert_uncle(cursor, blocknumber, uncle_address_id, uncle_nonce, uncle_balance, uncle_codehash, uncle_storageroot)
         state_update = prepare_state(state_id, blocknumber, uncle_address, uncle_nonce, uncle_balance, uncle_codehash, uncle_storageroot, None, 3)
-        state_updates.append(state_update)
+        block_states.append(state_update)
         state_id += 1
 
       miner = block.split('$')[1].split('\n')[0:5]
       miner_address = miner[0].split(':0x')[1].lower()
-      miner_nonce = miner[1].split(':')[1]
-      miner_balance = miner[2].split(':')[1]
+      miner_nonce = int(miner[1].split(':')[1])
+      miner_balance = int(miner[2].split(':')[1])
       miner_codehash = miner[3].split(':')[1][2:]
       miner_storageroot = miner[4].split(':')[1][2:]
 
       state_update = prepare_state(state_id, blocknumber, miner_address, miner_nonce, miner_balance, miner_codehash, miner_storageroot, None, 1)
-      state_updates.append(state_update)
+      block_states.append(state_update)
       state_id += 1
+
+      state_updates[blocknumber] = block_states
+      slot_updates[blocknumber] = block_slots
+      contract_updates[blocknumber] = block_contracts
 
   return state_updates, slot_updates
 
@@ -243,7 +252,6 @@ def prepare_state(state_id, blocknumber, address, nonce, balance, codehash, stor
     storageroot = bytes.fromhex(storageroot)
 
   return {
-    'id': state_id,
     'blocknumber': blocknumber,
     'type': type_value,
     'txindex': txindex,
