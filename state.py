@@ -176,8 +176,6 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
               slot = {'slot': v.split(',')[0].split('0x')[1],'value': ij.split(',value:0x')[1]}
               if slot['value'] == '0':
                 slot['value'] = None
-              else:
-                slot['value'] = bytes.fromhex(slot['value'])
               slots.append(slot)
     
           address = write['address']
@@ -244,12 +242,8 @@ def prepare_state(state_id, blocknumber, address, nonce, balance, codehash, stor
   emptystorageroot = 'pty'
   if codehash == emptycodehash or codehash == None:
     codehash = None
-  else:
-    codehash = bytes.fromhex(codehash)
   if storageroot == emptystorageroot or storageroot == None:
     storageroot = None
-  else:
-    storageroot = bytes.fromhex(storageroot)
 
   return {
     'blocknumber': blocknumber,
