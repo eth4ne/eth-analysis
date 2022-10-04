@@ -142,6 +142,7 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
             'delete': False,
             'storageroot': None,
           }
+          slots = []
           for ij in write_data:
             k = ij.split(':')[0]
             v = ij.split(':')[1]
@@ -154,9 +155,9 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
               write['address'] = v[2:]
               write['delete'] = True
             elif k == 'Nonce':
-              write['nonce'] = v
+              write['nonce'] = int(v)
             elif k == 'Balance':
-              write['balance'] = v
+              write['balance'] = int(v)
             elif k == 'CodeHash':
               write['codehash'] = v[2:]
             elif k == 'StorageRoot':
@@ -171,12 +172,15 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
                 slot['value'] = None
               else:
                 slot['value'] = bytes.fromhex(slot['value'])
-              slot_updates.append(slot)
+              slots.append(slot)
     
           address = write['address']
 
           if write['delete'] == True and tx['type'] != 7:
             state_update = prepare_state(state_id, blocknumber, address, None, None, None, None, tx['index'], 63)
+            for slot in slots:
+              slot['address'] = address
+              slot_updates.append(slot)
             state_updates.append(state_update)
             state_id += 1
           elif write['delete'] == True:
@@ -184,6 +188,9 @@ def get_state(_from, _to, interval=1000, datadir='/ethereum/txsubstate'):
             pass
           else:
             state_update = prepare_state(state_id, blocknumber, address, write['nonce'], write['balance'], write['codehash'], write['storageroot'], tx['index'], state_type+1)
+            for slot in slots:
+              slot['address'] = address
+              slot_updates.append(slot)
             state_updates.append(state_update)
             state_id += 1
         
