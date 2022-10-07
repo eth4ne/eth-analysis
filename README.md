@@ -34,6 +34,7 @@
   * MySQL
   * MariaDB
   * Web3.js
+  * argparse
 * Python 3
   * PyMySQL
 
