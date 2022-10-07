@@ -1,6 +1,5 @@
 //--max_old_space_size=4096
 
-const mysql = require('mysql');
 const mariadb = require('mariadb');
 const fs = require('fs');
 const { ArgumentParser } = require('argparse');
@@ -23,21 +22,6 @@ let log_period = 10000;
 let cnt_block = 0, cnt_state = 0;
 
 let start = new Date();
-
-function sleep(ms) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-}
-
-function mysql_query(conn, sql, data) {
-  return new Promise((resolve, reject) => {
-    conn.query(sql, data, (error, results, fields) => {
-      if (error) reject(error);
-      resolve(results);
-    });
-  })
-}
 
 let cache_account = {};
 let cache_block = {};
