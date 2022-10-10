@@ -77,7 +77,7 @@ async function run(from, to) {
           } else { //write
             update_account(addr, i+k, 1);
           }
-          cache_block_tmp[addr] = 1;
+          if (addr in cache_account) cache_block_tmp[addr] = 1;
           cnt_state++;
         } catch {
           console.error('Error blk #%d, j #%d', result[k][j].blocknumber, j);
@@ -92,7 +92,7 @@ async function run(from, to) {
           let block_removal = i+k - j - epoch_inactivate_older_than;
           if ((block_removal) in cache_block) {
             for (let l in cache_block[block_removal]) {
-              if (cache_account[l] >= i+k - epoch_inactivate_every - 1 - epoch_inactivate_older_than && cache_account[l] < i+k - epoch_inactivate_older_than) {
+              if (cache_account[l] >= 0 && cache_account[l] <= i+k - epoch_inactivate_older_than) {
                 cache_account[l] = -block_removal;
               }
             }
