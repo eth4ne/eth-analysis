@@ -80,13 +80,14 @@ run_txtype = False
 
 #account type (addresses table)
 #type 4: Uncertain (EoA or CA, first appears as read in state access, includes contract failed to be deployed)
-#type 5: Uncertain (EoA or CA, first appears as block or uncle miner)
+
 #type 6: EoA (EoA or CA, first appears as write in state access)
 #type 7: CA (null or not null), Deployed from EoA
 #type 8: Uncertain (EoA or CA, first appears as block or uncle miner)
 #type 9: CA (null or not null), Deployed from CA
 #type 10: Uncertain (EoA or CA, presale)
 #type 11: Uncertain (EoA or CA, not exist but delete requested)
+#type 12: EoA (sent at least one transaction)
 
 slot_cache = {}
 account_cache = {}
@@ -293,6 +294,9 @@ def run(_from, _to):
                 address_id = find_account_id(cursor, write['address'])
                 if address_id == None:
                   address_id = insert_account(cursor, write['address'], 6)
+              if tx['from'] != None:
+                address_id = find_account_id(cursor, tx['from'])
+                update_account_type(cursor, address_id, 12)
                 
               #  exit()
           if run_txtype == True and i != 0:
