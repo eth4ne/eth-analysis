@@ -48,10 +48,8 @@ log_period = args.log_every;
 
 async function run(from, to) {
   conn = await mariadb.createConnection({host: db_host, user: db_user, password: db_pass, database: db_name});
-  //await conn.connect();
   let batch_size = 100;
   for (let i = from; i <= to; i+=batch_size) {
-    //read, write
     let query = await conn.query("SELECT `address_id`, `blocknumber`, `type` FROM `states` WHERE `blocknumber`>=? AND `blocknumber`<?;", [i, Math.min(i+batch_size, to+1)]);
     let result = Array.from(Array(batch_size), () => {
       return [];
@@ -65,18 +63,13 @@ async function run(from, to) {
       let cache_block_tmp = {};
       for (let j in result[k]) {
         try {
-          //let addr = Buffer.from(query[j].address).toString('hex');
           let addr = result[k][j].address_id;
           if (addr in cache_account) {
             let height_positive = cache_account[addr] >= 0 ? cache_account[addr] : -cache_account[addr];
-            if (cache_account[addr] >= i+k - epoch_inactivate_every - 1 - epoch_inactivate_older_than && cache_account[addr] >= 0)
+            if (result[k][j].type & 1 == 1 && cache_account[addr] >= i+k - epoch_inactivate_every - 1 - epoch_inactivate_older_than && cache_account[addr] >= 0)
             delete cache_block[height_positive][addr];
           }
-          if (result[k][j].type % 2 == 0) { //read
-            update_account(addr, i+k, 0);
-          } else { //write
-            update_account(addr, i+k, 1);
-          }
+          update_account(addr, i+k, result[k][j].type & 1);
           if (addr in cache_account) cache_block_tmp[addr] = 1;
           cnt_state++;
         } catch {
@@ -92,8 +85,8 @@ async function run(from, to) {
           let block_removal = i+k - j - epoch_inactivate_older_than;
           if ((block_removal) in cache_block) {
             for (let l in cache_block[block_removal]) {
-              if (cache_account[l] >= 0 && cache_account[l] <= i+k - epoch_inactivate_older_than) {
-                cache_account[l] = -block_removal;
+              if ((!(cache_account[l] & 0x80000000)) && cache_account[l] <= i+k - epoch_inactivate_older_than) {
+                cache_account[l] = block_removal ^ 0x80000000;
               }
             }
             delete cache_block.block_removal;
@@ -132,8 +125,7 @@ async function run(from, to) {
 
 async function update_account (address, blocknumber, type) {
   if (type === 0) { //read
-    if (address in cache_account && cache_account[address] < 0) {
-      //console.log('Restore: 0x' + address + ' at #' + blocknumber + ' (last tx at #' + (-cache_account[address]) + ')');
+    if (address in cache_account && (cache_account[address] & 0x80000000)) {
       if (blocknumber in restore) {
         restore[blocknumber].push(address);
       } else {
@@ -142,8 +134,7 @@ async function update_account (address, blocknumber, type) {
       cache_account[address] = blocknumber;
     }
   } else if (type === 1) { //write
-    if (address in cache_account && cache_account[address] < 0) {
-      //console.log('Restore: 0x' + address + ' at #' + blocknumber + ' (last tx at #' + (-cache_account[address]) + ')');
+    if (address in cache_account && (cache_account[address] & 0x80000000)) {
       if (blocknumber in restore) {
         restore[blocknumber].push(address);
       } else {
