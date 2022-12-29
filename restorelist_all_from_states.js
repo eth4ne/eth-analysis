@@ -9,7 +9,7 @@ const parser = new ArgumentParser({ description: 'Restore list generator' })
 const db_host = 'localhost';
 
 const db_user = 'ethereum';
-const db_pass = '';
+const db_pass = '1234';
 const db_name = 'ethereum';
 
 let epoch_inactivate_every = 40320;
