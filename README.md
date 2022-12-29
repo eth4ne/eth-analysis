@@ -3,6 +3,9 @@
 * [ethereum.sql](ethereum.sql)
   * A SQL template to initialize the DB structure.
 
+* [ethereum-norelation.sql](ethereum-norelation.sql)
+  * A SQL template to initialize the DB structure, without inter-table constraints
+
 * [block_tx_contract.js](block_tx_contract.js)
   * A node.js script to index block/uncle/transaction/contract DB into MariaDB from geth, as ```blocks```, ```uncles```, ```transactions```, ```contracts``` table.
   * Includes stationkeeper functionality, which keep track the latest block and index them.
@@ -28,6 +31,12 @@
 
 * [txsubstate.py](txsubstate.py)
   * Parse dumped txsubstate file and index into the DB.
+
+* [wipe.py](wipe.py)
+  * DB wiper.
+
+* [frontier.json](frontier.json)
+  * The original genesis.json for ethereum mainnet.
 
 ### Script requirements
 * Node.js

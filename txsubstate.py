@@ -75,7 +75,7 @@ run_txtype = False
 #7: failed contract call
 
 #account type (accounts table)
-#type 0: Uncertain (EoA or CA, first appears as tx from or to)
+#type 0: Uncertain (EoA or CA, first appears as tx to)
 #type 1: CA (deployed from EoA, parsed from transactionreceipt)
 
 #account type (addresses table)
