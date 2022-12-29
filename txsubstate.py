@@ -91,6 +91,7 @@ run_txtype = False
 
 slot_cache = {}
 account_cache = {}
+account_type_cache = {}
 
 def run(_from, _to):
   conn = conn_mariadb(db_host, db_user, db_pass, db_name)
@@ -366,9 +367,11 @@ def find_account_id(cursor, address):
   if result == None:
     return None
   else:
-    result = result['id']
-  account_cache[address] = result
-  return result
+    _id = result['id']
+    acctype = result['_type']
+  account_cache[address] = _id
+  account_type_cache[address] = acctype
+  return _id
 
 def find_slot_id(cursor, slot):
   if slot in slot_cache:
@@ -423,6 +426,7 @@ def insert_account(cursor, address, type):
   sql = "INSERT INTO `addresses` (`address`, `_type`) VALUES (%s, %s);"
   cursor.execute(sql, (address, type))
   account_cache[address] = cursor.lastrowid
+  account_type_cache[address] = type
   return cursor.lastrowid
 
 def insert_contract(cursor, address, creationtx, code):
@@ -436,12 +440,14 @@ def insert_contract(cursor, address, creationtx, code):
     update_contract(cursor, address, creationtx, code)
 
 def update_contract(cursor, address, creationtx, code):
-  #print('Contract updated: {}'.format(address.hex()))
   sql = "UPDATE `contracts` SET `code`=%s, `creationtx`=%s WHERE `address`=%s;"
   cursor.execute(sql, (code, creationtx, address)) 
 
 def update_account_type(cursor, address_id, type):
+  if address_id in account_type_cache and account_type_cache[address_id] == type:
+    return
   sql = "UPDATE `addresses` SET `_type`=%s WHERE `id`=%s;"
+  account_type_cache[address_id] = type
   cursor.execute(sql, (type, address_id))
 
 run(start_block, end_block)
