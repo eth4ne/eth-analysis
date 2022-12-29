@@ -288,6 +288,7 @@ def run(_from, _to):
                   else:
                     print('Error: deployed ca and the address mismatch')
                     print('DeployedCA: {}, address: {}'.format(tx['deployedca'], write['address']))
+                    exit(1)
                     #insert_contract(cursor, write['address'], tx['hash'], write['code'])
             
             if run_account == True:
@@ -348,7 +349,7 @@ def run(_from, _to):
       except:
         print('Error in block #{}'.format(blocknumber))
         traceback.print_exc()
-        return
+        exit(1)
     print('Indexed {}'.format(filename))
 
 def get_latest_state(cursor):
@@ -411,10 +412,10 @@ def insert_state_batch(cursor, states):
     cursor.executemany(sql, states)
   except pymysql.err.DataError:
     print('DataError at block #{}'.format(states[0][0]))
-    exit()
+    exit(1)
   except pymysql.err.IntegrityError:
     print('IntegrityError at block #{}'.format(states[0][0]))
-    exit()
+    exit(1)
 
 def update_tx(cursor, txhash, txclass):
   txhash = bytes.fromhex(txhash)
