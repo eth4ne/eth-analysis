@@ -20,13 +20,13 @@ CREATE TABLE `accounts` (
   `minedblockn` int(11) DEFAULT NULL,
   `minedunclen` int(11) DEFAULT NULL,
   `_type` tinyint(4) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=ascii;
+) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
 CREATE TABLE `addresses` (
   `id` int(11) NOT NULL,
   `address` binary(20) NOT NULL,
   `_type` tinyint(4) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=ascii;
+) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
 CREATE TABLE `blocks` (
   `number` int(11) NOT NULL,
@@ -38,7 +38,7 @@ CREATE TABLE `blocks` (
   `size` int(11) NOT NULL,
   `gasused` int(11) NOT NULL,
   `gaslimit` int(11) NOT NULL,
-  `extradata` binary(32) NOT NULL,
+  `extradata` varbinary(32) NOT NULL,
   `hash` binary(32) NOT NULL,
   `parenthash` binary(32) NOT NULL,
   `sha3uncles` binary(32) NOT NULL,
@@ -47,15 +47,15 @@ CREATE TABLE `blocks` (
   `receiptsroot` binary(32) NOT NULL,
   `transactionsroot` binary(32) NOT NULL,
   `mixhash` binary(32) NOT NULL,
-  `basefee` bigint(20) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=ascii;
+  `basefee` bigint(20) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
 CREATE TABLE `contracts` (
   `id` int(11) NOT NULL,
   `address` binary(20) NOT NULL,
   `creationtx` binary(32) NOT NULL,
   `code` mediumblob DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=ascii;
+) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
 CREATE TABLE `slotlogs` (
   `id` bigint(20) NOT NULL,
@@ -63,12 +63,12 @@ CREATE TABLE `slotlogs` (
   `address_id` int(11) NOT NULL,
   `slot_id` int(11) NOT NULL,
   `slotvalue` varbinary(64) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=ascii;
+) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
 CREATE TABLE `slots` (
   `id` int(11) NOT NULL,
   `slot` binary(32) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=ascii;
+) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
 CREATE TABLE `states` (
   `id` bigint(20) NOT NULL,
@@ -80,7 +80,7 @@ CREATE TABLE `states` (
   `balance` decimal(32,0) DEFAULT NULL,
   `codehash` binary(32) DEFAULT NULL,
   `storageroot` binary(32) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=ascii;
+) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
 CREATE TABLE `transactions` (
   `id` bigint(20) NOT NULL,
@@ -99,7 +99,7 @@ CREATE TABLE `transactions` (
   `s` binary(32) NOT NULL,
   `type` binary(1) NOT NULL,
   `class` tinyint(4) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=ascii;
+) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
 CREATE TABLE `uncles` (
   `id` int(11) NOT NULL,
@@ -122,7 +122,7 @@ CREATE TABLE `uncles` (
   `transactionsroot` binary(32) NOT NULL,
   `mixhash` binary(32) NOT NULL,
   `basefee` bigint(20) NOT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=ascii;
+) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
 
 ALTER TABLE `accounts`
@@ -213,31 +213,6 @@ ALTER TABLE `transactions`
 
 ALTER TABLE `uncles`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
-
-ALTER TABLE `accounts`
-  ADD CONSTRAINT `accounts_ibfk_1` FOREIGN KEY (`firsttx`) REFERENCES `blocks` (`number`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  ADD CONSTRAINT `accounts_ibfk_2` FOREIGN KEY (`lasttx`) REFERENCES `blocks` (`number`) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
-ALTER TABLE `blocks`
-  ADD CONSTRAINT `blocks_ibfk_1` FOREIGN KEY (`miner`) REFERENCES `accounts` (`address`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  ADD CONSTRAINT `blocks_ibfk_2` FOREIGN KEY (`parenthash`) REFERENCES `blocks` (`hash`) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
-ALTER TABLE `contracts`
-  ADD CONSTRAINT `contracts_ibfk_2` FOREIGN KEY (`creationtx`) REFERENCES `transactions` (`hash`) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
-ALTER TABLE `states`
-  ADD CONSTRAINT `states_ibfk_2` FOREIGN KEY (`blocknumber`) REFERENCES `blocks` (`number`) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
-ALTER TABLE `transactions`
-  ADD CONSTRAINT `transactions_ibfk_1` FOREIGN KEY (`blocknumber`) REFERENCES `blocks` (`number`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  ADD CONSTRAINT `transactions_ibfk_2` FOREIGN KEY (`from`) REFERENCES `accounts` (`address`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  ADD CONSTRAINT `transactions_ibfk_3` FOREIGN KEY (`to`) REFERENCES `accounts` (`address`) ON DELETE NO ACTION ON UPDATE NO ACTION;
-
-ALTER TABLE `uncles`
-  ADD CONSTRAINT `uncles_ibfk_1` FOREIGN KEY (`blocknumber`) REFERENCES `blocks` (`number`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  ADD CONSTRAINT `uncles_ibfk_2` FOREIGN KEY (`miner`) REFERENCES `accounts` (`address`) ON DELETE NO ACTION ON UPDATE NO ACTION,
-  ADD CONSTRAINT `uncles_ibfk_3` FOREIGN KEY (`parenthash`) REFERENCES `blocks` (`hash`) ON DELETE NO ACTION ON UPDATE NO ACTION;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
