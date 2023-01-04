@@ -193,9 +193,6 @@ ALTER TABLE `accounts`
 ALTER TABLE `addresses`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
-ALTER TABLE `blocks`
-  MODIFY `number` int(11) NOT NULL AUTO_INCREMENT;
-
 ALTER TABLE `contracts`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
