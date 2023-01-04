@@ -115,7 +115,7 @@ async function run(from, to) {
       
       console.error('Block #%d', i);
       console.error('Speed: %dbps, %dtps, %dups (Time interval %ds)', ((cnt_block-cnt_block_prev)/interval*1000).toFixed(1), ((cnt_tx-cnt_tx_prev)/interval*1000).toFixed(1), ((cnt_uncle-cnt_uncle_prev)/ms*1000).toFixed(1), (interval/1000).toFixed(2));
-      console.error('Avg: %dbps, %dtps, %dups (%dblk / %dtx / %ducl in %ds)', ((cnt_block)/ms*1000).toFixed(1), ((cnt_tx)/ms*1000).toFixed(1), ((cnt_uncle)/ms*1000).toFixed(1), cnt_block, cnt_tx, cnt_uncle, (ms/1000).toFixed(2));
+      console.error('Avg: %dbps, %dtps, %dups\n     %dblk / %dtx / %ducl in %ds', ((cnt_block)/ms*1000).toFixed(1), ((cnt_tx)/ms*1000).toFixed(1), ((cnt_uncle)/ms*1000).toFixed(1), cnt_block, cnt_tx, cnt_uncle, (ms/1000).toFixed(2));
       
       time_prev = new Date();
       cnt_block_prev = cnt_block;
@@ -134,7 +134,7 @@ async function insert_block_batch (conn, block, txn) {
     if ("baseFeePerGas" in block) {
       basefee = block.baseFeePerGas
     }
-    await conn.query("INSERT INTO `blocks` (`number`, `timestamp`, `transactions`, `miner`, `difficulty`, `totaldifficulty`, `size`, `gasused`, `gaslimit`, `extradata`, `hash`, `parenthash`, `sha3uncles`, `stateroot`, `nonce`, `receiptsroot`, `transactionsroot`, `mixhash`, `basefee`) VALUES (?, ?, ?, UNHEX(SUBSTRING(?, 3)), ?, ?, ?, ?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), ?);", [block.number, block.timestamp, txn, block.miner, block.difficulty, block.totalDifficulty, block.size, block.gasUsed, block.gasLimit, block.extraData, block.hash, block.parentHash, block.sha3Uncles, block.stateRoot, block.nonce, block.receiptsRoot, block.transactionsRoot, block.mixHash, basefee]);
+    await conn.query("INSERT INTO `blocks` (`number`, `timestamp`, `transactions`, `miner`, `difficulty`, `totaldifficulty`, `size`, `gasused`, `gaslimit`, `extradata`, `hash`, `parenthash`, `sha3uncles`, `stateroot`, `nonce`, `receiptsroot`, `transactionsroot`, `mixhash`, `basefee`) VALUES (?, ?, ?, UNHEX(LPAD(SUBSTRING(?, 3), 40, '0')), ?, ?, ?, ?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 16, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), ?);", [block.number, block.timestamp, txn, block.miner, block.difficulty, block.totalDifficulty, block.size, block.gasUsed, block.gasLimit, block.extraData, block.hash, block.parentHash, block.sha3Uncles, block.stateRoot, block.nonce, block.receiptsRoot, block.transactionsRoot, block.mixHash, basefee]);
   } catch (err) {
     console.log(err);
     console.log('Error insert: blk #%d', block.number);
@@ -143,7 +143,7 @@ async function insert_block_batch (conn, block, txn) {
 
 async function insert_tx_batch (conn, block, tx) {
   try {
-    await conn.query("INSERT INTO `transactions` (`blocknumber`, `hash`, `from`, `to`, `gas`, `gasprice`, `input`, `nonce`, `transactionindex`, `value`, `v`, `r`, `s`, `type`) VALUES (?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), ?, ?, UNHEX(SUBSTRING(?, 3)), ?, ?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)));", [block.number, tx.hash, tx.from, tx.to, tx.gas, tx.gasPrice, tx.input, tx.nonce, tx.transactionIndex, tx.value, tx.v, tx.r, tx.s, tx.type]);
+    await conn.query("INSERT INTO `transactions` (`blocknumber`, `hash`, `from`, `to`, `gas`, `gasprice`, `input`, `nonce`, `transactionindex`, `value`, `v`, `r`, `s`, `type`) VALUES (?, UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 40, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 40, '0')), ?, ?, UNHEX(SUBSTRING(?, 3)), ?, ?, ?, UNHEX(LPAD(SUBSTRING(?, 3), 2, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(SUBSTRING(?, 3)));", [block.number, tx.hash, tx.from, tx.to, tx.gas, tx.gasPrice, tx.input, tx.nonce, tx.transactionIndex, tx.value, tx.v, tx.r, tx.s, tx.type]);
   } catch (err) {
     console.log(err);
     console.log('Error insert: blk #%d, tx #%d', block.number, tx.transactionIndex);
@@ -156,7 +156,7 @@ async function insert_uncle_batch (conn, block, uncle, uncleposition) {
     if ("baseFeePerGas" in uncle) {
       basefee = uncle.baseFeePerGas
     }
-    await conn.query("INSERT INTO `uncles` (`blocknumber`, `uncleheight`, `uncleposition`, `timestamp`, `miner`, `difficulty`, `size`, `gasused`, `gaslimit`, `extradata`, `hash`, `parenthash`, `sha3uncles`, `stateroot`, `nonce`, `receiptsroot`, `transactionsroot`, `mixhash`, `basefee`) VALUES (?, ?, ?, ?, UNHEX(SUBSTRING(?, 3)), ?, ?, ?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), ?);", [block.number, uncle.number, uncleposition, uncle.timestamp, uncle.miner, uncle.difficulty, uncle.size, uncle.gasUsed, uncle.gasLimit, uncle.extraData, uncle.hash, uncle.parentHash, uncle.sha3Uncles, uncle.stateRoot, uncle.nonce, uncle.receiptsRoot, uncle.transactionsRoot, uncle.mixHash, basefee]);
+    await conn.query("INSERT INTO `uncles` (`blocknumber`, `uncleheight`, `uncleposition`, `timestamp`, `miner`, `difficulty`, `size`, `gasused`, `gaslimit`, `extradata`, `hash`, `parenthash`, `sha3uncles`, `stateroot`, `nonce`, `receiptsroot`, `transactionsroot`, `mixhash`, `basefee`) VALUES (?, ?, ?, ?, UNHEX(LPAD(SUBSTRING(?, 3), 40, '0')), ?, ?, ?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 16, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), ?);", [block.number, uncle.number, uncleposition, uncle.timestamp, uncle.miner, uncle.difficulty, uncle.size, uncle.gasUsed, uncle.gasLimit, uncle.extraData, uncle.hash, uncle.parentHash, uncle.sha3Uncles, uncle.stateRoot, uncle.nonce, uncle.receiptsRoot, uncle.transactionsRoot, uncle.mixHash, basefee]);
   } catch (err) {
     console.log(err);
     console.log('Error insert: blk #%d, ucl #%d', block.number, uncleposition);
@@ -165,7 +165,7 @@ async function insert_uncle_batch (conn, block, uncle, uncleposition) {
 
 async function insert_contract_batch (conn, address, txhash) {
   try {
-    await conn.query("INSERT INTO `contracts` (`address`, `creationtx`) VALUES(UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)));", [address, txhash]);
+    await conn.query("INSERT INTO `contracts` (`address`, `creationtx`) VALUES(UNHEX(LPAD(SUBSTRING(?, 3), 40, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')));", [address, txhash]);
   } catch (err) {
     console.log(err);
     console.log('Error insert: contract ', address);
@@ -175,7 +175,7 @@ async function insert_contract_batch (conn, address, txhash) {
 async function insert_account_batch (conn, id, address, txn, sent, received, contract, firsttx, lasttx, balance, minedblockn, minedunclen, _type) {
   try {
     if (id === null) {
-      await conn.query("INSERT INTO `accounts` (`address`, `txn`, `sent`, `received`, `contract`, `firsttx`, `lasttx`, `balance`, `minedblockn`, `minedunclen`, `_type`) values (UNHEX(SUBSTRING(?, 3)), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);", [address, txn, sent, received, contract, firsttx, lasttx, balance, minedblockn, minedunclen, _type]);
+      await conn.query("INSERT INTO `accounts` (`address`, `txn`, `sent`, `received`, `contract`, `firsttx`, `lasttx`, `minedblockn`, `minedunclen`, `_type`) values (UNHEX(LPAD(SUBSTRING(?, 3), 40, '0')), ?, ?, ?, ?, ?, ?, ?, ?, ?);", [address, txn, sent, received, contract, firsttx, lasttx, balance, minedblockn, minedunclen, _type]);
     } else {
       await conn.query("UPDATE `accounts` SET `txn`=?, `sent`=?, `received`=?, `contract`=?, `firsttx`=?, `lasttx`=? WHERE `id`=?;", [txn, sent, received, contract, firsttx, lasttx, id]);
     }
