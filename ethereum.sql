@@ -122,6 +122,7 @@ CREATE TABLE `uncles` (
   `transactionsroot` binary(32) NOT NULL,
   `mixhash` binary(32) NOT NULL,
   `basefee` bigint(20) NOT NULL
+  `logsbloom` blob DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
 
