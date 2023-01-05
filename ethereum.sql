@@ -112,7 +112,7 @@ CREATE TABLE `uncles` (
   `size` int(11) NOT NULL,
   `gasused` int(11) NOT NULL,
   `gaslimit` int(11) NOT NULL,
-  `extradata` binary(32) NOT NULL,
+  `extradata` varbinary(32) NOT NULL,
   `hash` binary(32) NOT NULL,
   `parenthash` binary(32) NOT NULL,
   `sha3uncles` binary(32) NOT NULL,
@@ -121,7 +121,7 @@ CREATE TABLE `uncles` (
   `receiptsroot` binary(32) NOT NULL,
   `transactionsroot` binary(32) NOT NULL,
   `mixhash` binary(32) NOT NULL,
-  `basefee` bigint(20) NOT NULL
+  `basefee` bigint(20) DEFAULT NULL,
   `logsbloom` blob DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
