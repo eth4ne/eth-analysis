@@ -8,7 +8,8 @@ db_name = 'ethereum'
 
 conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host, user=user, password=password, database=database, cursorclass=pymysql.cursors.DictCursor)
 
-f = open('frontier.json', 'r')
+# f = open('frontier.json', 'r')
+f = open('frontier_sorted.json', 'r')
 alloc = json.loads(f.read())['alloc']
 
 conn = conn_mariadb(db_host, db_user, db_pass, db_name)
