@@ -8,9 +8,9 @@ db_name = 'ethereum'
 
 conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host, user=user, password=password, database=database, cursorclass=pymysql.cursors.DictCursor)
 
-# f = open('frontier.json', 'r')
-f = open('frontier_sorted.json', 'r')
+f = open('frontier.json', 'r')
 alloc = json.loads(f.read())['alloc']
+alloc = sorted(alloc.items(), key=lambda x: x[0])
 
 conn = conn_mariadb(db_host, db_user, db_pass, db_name)
 cursor = conn.cursor()
@@ -22,7 +22,7 @@ cursor.execute("TRUNCATE `slots`;")
 cursor.execute("TRUNCATE `states`;")
 conn.commit()
 
-for account, balance in alloc.items():
+for account, balance in alloc:
   address = account[2:]
 
   sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
