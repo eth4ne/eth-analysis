@@ -4,6 +4,7 @@ import time
 import argparse
 import os
 import traceback
+from web3 import Web3
 
 db_host = 'localhost'
 db_user = 'ethereum'
@@ -424,8 +425,9 @@ def update_tx(cursor, txhash, txclass):
 
 def insert_account(cursor, address, type):
   address = bytes.fromhex(address)
-  sql = "INSERT INTO `addresses` (`address`, `_type`) VALUES (%s, %s);"
-  cursor.execute(sql, (address, type))
+  addresshash = Web3.toHex(Web3.keccak(hexstr=address))
+  sql = "INSERT INTO `addresses` (`address`, `hash`, `_type`) VALUES (%s, %s, %s);"
+  cursor.execute(sql, (address, addresshash, type))
   account_cache[address] = cursor.lastrowid
   account_type_cache[address] = type
   return cursor.lastrowid

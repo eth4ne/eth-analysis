@@ -25,6 +25,7 @@ CREATE TABLE `accounts` (
 CREATE TABLE `addresses` (
   `id` int(11) NOT NULL,
   `address` binary(20) NOT NULL,
+  `hash` binary(32) NOT NULL,
   `_type` tinyint(4) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
@@ -142,6 +143,7 @@ ALTER TABLE `accounts`
 ALTER TABLE `addresses`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `address` (`address`) USING BTREE,
+  ADD UNIQUE KEY `hash` (`hash`),
   ADD KEY `_type` (`_type`);
 
 ALTER TABLE `blocks`
