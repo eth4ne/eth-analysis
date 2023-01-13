@@ -1,5 +1,6 @@
 import pymysql.cursors
 import json
+from web3 import Web3
 
 db_host = 'localhost'
 db_user = 'ethereum'
@@ -24,16 +25,15 @@ conn.commit()
 
 for account, balance in alloc:
   address = account[2:]
+  addresshash = Web3.toHex(Web3.keccak(hexstr=address))[2:]
 
   sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
   cursor.execute(sql, (address,))
   result = cursor.fetchone()
   if result == None:
-    sql = "INSERT INTO `addresses` SET `address`=UNHEX(%s), `_type`=%s;"
-    cursor.execute(sql, (address, 10))
+    sql = "INSERT INTO `addresses` SET `address`=UNHEX(%s), `hash`=UNHEX(%s), `_type`=%s;"
+    cursor.execute(sql, (address, addresshash, 10))
   address_id = cursor.lastrowid
   cursor.execute("INSERT INTO `states` (`blocknumber`, `type`, `address_id`, `balance`) VALUES (0, 31, %s, %s);", (address_id, balance['balance']))
-
-#cursor.execute("INSERT INTO `states` (`blocknumber`, `type`, `address`, `balance`) VALUES (0, 1, UNHEX('00000000000000000000000000000000'), 5000000000000000000);")
   
 conn.commit()

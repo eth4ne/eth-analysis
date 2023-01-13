@@ -424,8 +424,8 @@ def update_tx(cursor, txhash, txclass):
   cursor.execute(sql, (txclass, txhash))
 
 def insert_account(cursor, address, type):
+  addresshash = bytes.fromhex(Web3.toHex(Web3.keccak(hexstr=address))[2:])
   address = bytes.fromhex(address)
-  addresshash = Web3.toHex(Web3.keccak(hexstr=address))
   sql = "INSERT INTO `addresses` (`address`, `hash`, `_type`) VALUES (%s, %s, %s);"
   cursor.execute(sql, (address, addresshash, type))
   account_cache[address] = cursor.lastrowid
