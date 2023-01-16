@@ -48,6 +48,7 @@ CREATE TABLE `blocks` (
   `receiptsroot` binary(32) NOT NULL,
   `transactionsroot` binary(32) NOT NULL,
   `mixhash` binary(32) NOT NULL,
+  `logsbloom` blob DEFAULT NULL,
   `basefee` bigint(20) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
@@ -122,8 +123,8 @@ CREATE TABLE `uncles` (
   `receiptsroot` binary(32) NOT NULL,
   `transactionsroot` binary(32) NOT NULL,
   `mixhash` binary(32) NOT NULL,
-  `basefee` bigint(20) DEFAULT NULL,
-  `logsbloom` blob DEFAULT NULL
+  `logsbloom` blob DEFAULT NULL,
+  `basefee` bigint(20) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
 
@@ -149,8 +150,7 @@ ALTER TABLE `addresses`
 ALTER TABLE `blocks`
   ADD PRIMARY KEY (`number`),
   ADD UNIQUE KEY `hash` (`hash`),
-  ADD KEY `miner` (`miner`),
-  ADD KEY `parenthash` (`parenthash`);
+  ADD KEY `miner` (`miner`);
 
 ALTER TABLE `contracts`
   ADD PRIMARY KEY (`id`),
@@ -179,15 +179,13 @@ ALTER TABLE `transactions`
   ADD KEY `blocknumber` (`blocknumber`),
   ADD KEY `from` (`from`),
   ADD KEY `to` (`to`),
-  ADD KEY `value` (`value`),
   ADD KEY `class` (`class`);
 
 ALTER TABLE `uncles`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `hash` (`hash`),
   ADD KEY `miner` (`miner`),
-  ADD KEY `blocknumber` (`blocknumber`),
-  ADD KEY `parenthash` (`parenthash`);
+  ADD KEY `blocknumber` (`blocknumber`);
 
 
 ALTER TABLE `accounts`
