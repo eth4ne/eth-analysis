@@ -192,7 +192,7 @@ def run(_from, _to):
               state_id += 1
               cnt_state += 1
               
-          writelist = txbody.split('#')[1].split('$')[0].split('.')[1:]
+          writelist = txbody.split('#')[1].split('$')[0].split('^')[0].split('.')[1:]
           for j in writelist:
             write_data = j.split('\n')[:-1]
             write = {
