@@ -142,7 +142,7 @@ def run(_from, _to):
             'deployedca': None,
           }
           if i == 0:
-            state_type = 33
+            state_type = 32
             tx['index'] = None
             txdata = []
           else:
