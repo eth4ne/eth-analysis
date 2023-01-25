@@ -100,7 +100,16 @@ CREATE TABLE `transactions` (
   `r` binary(32) NOT NULL,
   `s` binary(32) NOT NULL,
   `type` binary(1) NOT NULL,
+  `maxfeepergas` bigint(20) DEFAULT NULL,
+  `maxpriorityfeepergas` bigint(20) DEFAULT NULL,
   `class` tinyint(4) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
+
+CREATE TABLE `transactions_accesslist` (
+  `id` int(11) NOT NULL,
+  `hash` binary(32) NOT NULL,
+  `address` binary(20) NOT NULL,
+  `storagekeys` binary(32) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
 CREATE TABLE `uncles` (
@@ -181,6 +190,10 @@ ALTER TABLE `transactions`
   ADD KEY `to` (`to`),
   ADD KEY `class` (`class`);
 
+ALTER TABLE `transactions_accesslist`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `hash` (`hash`);
+
 ALTER TABLE `uncles`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `hash` (`hash`),
@@ -208,6 +221,9 @@ ALTER TABLE `states`
 
 ALTER TABLE `transactions`
   MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE `transactions_accesslist`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 ALTER TABLE `uncles`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
