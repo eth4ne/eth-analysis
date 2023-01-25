@@ -147,10 +147,34 @@ async function insert_block_batch (conn, block, txn) {
 
 async function insert_tx_batch (conn, block, tx) {
   try {
+    let maxfeepergas = null;
+    let maxpriorityfeepergas = null;
+    if (tx.type == 2) {
+      maxfeepergas = tx.maxFeePerGas;
+      maxpriorityfeepergas = tx.maxPriorityFeePerGas
+    }
     await conn.query("INSERT INTO `transactions` (`blocknumber`, `hash`, `from`, `to`, `gas`, `gasprice`, `input`, `nonce`, `transactionindex`, `value`, `v`, `r`, `s`, `type`, `maxfeepergas`, `maxpriorityfeepergas`) VALUES (?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), ?, ?, UNHEX(SUBSTRING(?, 3)), ?, ?, ?, UNHEX(LPAD(SUBSTRING(?, 3), 2, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')), UNHEX(LPAD(?, 2, '0')), ?, ?);", [block.number, tx.hash, tx.from, tx.to, tx.gas, tx.gasPrice, tx.input, tx.nonce, tx.transactionIndex, tx.value, tx.v, tx.r, tx.s, tx.type, maxfeepergas, maxpriorityfeepergas]);
+    if (tx.type == 1 || tx.type == 2) {
+      await insert_tx_accesslist_batch(conn, tx);
+    }
+    
   } catch (err) {
     console.log(err);
     console.log('Error insert: blk #%d, tx #%d', block.number, tx.transactionIndex);
+  }
+}
+
+async function insert_tx_accesslist_batch (conn, tx) {
+  try {
+    let accesslist = tx.accessList;
+    for (let i in accesslist) {
+      for (let j in accesslist[i].storageKeys) {
+        await conn.query("INSERT INTO `transactions_accesslist` (`hash`, `address`, `storagekeys`) VALUES (UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)));", [tx.hash, accesslist[i].address, accesslist[i].storageKeys[j]]);
+      }
+    }
+  } catch (err) {
+    console.log(err);
+    console.log('Error insert: blk #%d, tx #%d', tx.blockNumber, tx.transactionIndex);
   }
 }
 
