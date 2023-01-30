@@ -68,7 +68,7 @@ async function run(from, to) {
                 console.log('Error request: blk #%d, tx #%d (contract)', i, j);
               }
             }
-            await insert_tx_batch(conn, block, tx, 0);
+            await insert_tx_batch(conn, block, tx);
             cnt_tx++;
           } catch {
             console.log('Error request: blk #%d, tx #%d', i, j);
@@ -169,7 +169,7 @@ async function insert_tx_accesslist_batch (conn, tx) {
     let accesslist = tx.accessList;
     for (let i in accesslist) {
       for (let j in accesslist[i].storageKeys) {
-        await conn.query("INSERT INTO `transactions_accesslist` (`hash`, `address`, `storagekeys`) VALUES (UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)));", [tx.hash, accesslist[i].address, accesslist[i].storageKeys[j]]);
+        await conn.query("INSERT INTO `transactions_accesslist` (`blocknumber`, `transactionindex`, `address`, `storagekeys`) VALUES (?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)));", [tx.blockNumber, tx.transactionIndex, accesslist[i].address, accesslist[i].storageKeys[j]]);
       }
     }
   } catch (err) {

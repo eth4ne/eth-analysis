@@ -107,7 +107,8 @@ CREATE TABLE `transactions` (
 
 CREATE TABLE `transactions_accesslist` (
   `id` int(11) NOT NULL,
-  `hash` binary(32) NOT NULL,
+  `blocknumber` int(11) NOT NULL,
+  `transactionindex` int(11) NOT NULL,
   `address` binary(20) NOT NULL,
   `storagekeys` binary(32) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
@@ -192,7 +193,7 @@ ALTER TABLE `transactions`
 
 ALTER TABLE `transactions_accesslist`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `hash` (`hash`);
+  ADD KEY `blocknumber.txindex` (`blocknumber`,`transactionindex`);
 
 ALTER TABLE `uncles`
   ADD PRIMARY KEY (`id`),
