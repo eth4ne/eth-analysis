@@ -55,7 +55,8 @@ CREATE TABLE `blocks` (
 CREATE TABLE `contracts` (
   `id` int(11) NOT NULL,
   `address` binary(20) NOT NULL,
-  `creationtx` binary(32) NOT NULL,
+  `blocknumber` int(11) NOT NULL,
+  `transactionindex` int(11) NOT NULL,
   `code` mediumblob DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=ascii COLLATE=ascii_general_ci;
 
@@ -165,7 +166,7 @@ ALTER TABLE `blocks`
 ALTER TABLE `contracts`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `address` (`address`),
-  ADD KEY `creationtx` (`creationtx`) USING BTREE;
+  ADD KEY `blocknumber.txindex` (`blocknumber`,`transactionindex`);
 
 ALTER TABLE `slotlogs`
   ADD PRIMARY KEY (`id`),

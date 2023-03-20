@@ -62,7 +62,7 @@ async function run(from, to) {
             if (tx.to === null) {
               try {
                 let receipt = await web3.eth.getTransactionReceipt(tx.hash);
-                await insert_contract_batch(conn, receipt.contractAddress, tx.hash);
+                await insert_contract_batch(conn, receipt.contractAddress, tx);
                 await insert_account_batch(conn, null, receipt.contractAddress, 0, 0, 0, 0, null, null, null, null, null, 1);
               } catch {
                 console.log('Error request: blk #%d, tx #%d (contract)', i, j);
@@ -195,9 +195,9 @@ async function insert_uncle_batch (conn, block, uncle, uncleposition) {
   }
 }
 
-async function insert_contract_batch (conn, address, txhash) {
+async function insert_contract_batch (conn, address, tx) {
   try {
-    await conn.query("INSERT INTO `contracts` (`address`, `creationtx`) VALUES(UNHEX(LPAD(SUBSTRING(?, 3), 40, '0')), UNHEX(LPAD(SUBSTRING(?, 3), 64, '0')));", [address, txhash]);
+    await conn.query("INSERT INTO `contracts` (`address`, `blocknumber`, `transactionindex`) VALUES(UNHEX(LPAD(SUBSTRING(?, 3), 40, '0')), ?, ?);", [address, tx.blockNumber, tx.transactionIndex]);
   } catch (err) {
     console.log(err);
     console.log('Error insert: contract ', address);
