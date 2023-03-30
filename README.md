@@ -3,9 +3,6 @@
 * [ethereum.sql](ethereum.sql)
   * A SQL template to initialize the DB structure.
 
-* [ethereum-norelation.sql](ethereum-norelation.sql)
-  * A SQL template to initialize the DB structure, without inter-table constraints
-
 * [block_tx_contract.js](block_tx_contract.js)
   * A node.js script to index block/uncle/transaction/contract DB into MariaDB from geth, as ```blocks```, ```uncles```, ```transactions```, ```contracts``` table.
   * Includes stationkeeper functionality, which keep track the latest block and index them.
@@ -16,7 +13,7 @@
 * [miner_block.js](miner_block.js), [miner_uncle.js](miner_uncle.js)
   * Node.js scripts to iterate through the ```blocks``` and ```uncles``` table to count mined blocks and uncles for every account.
 
-* [restorelist_all_from_accounts.js](restorelist_all_from_accounts.js)
+* [restorelist.js](restorelist.js)
   * A node.js script to look up through the tx record and fetch the list of accounts to be restored per block.
 
 * [restorelist_all_from_states.js](restorelist_all_from_states.js)
@@ -46,6 +43,30 @@
   * argparse
 * Python 3
   * PyMySQL
+  * web3.py
 
 ### DB structure and relationships
 
+* TODO
+
+### Setup the DB
+* Install the requirements.
+```sh
+$ pip3 install pymysql web3
+```
+* Import the database scheme
+  * Asseme that DB user is *user* and DB name is *ethereum*.
+```sh
+$ mysql -u user ethereum < ethereum.sql
+```
+
+#### Index tx state/slot update logs
+* Insert the state update logs into the DB.
+  * Assume that the state update logs are created for every 1000 block interval from the first to 10M blocks.
+```sh
+$ python3 txsubstate.py -s 1 -e 10000000 -d ./txsubstate -i 1000
+```
+
+#### Index blocks, uncles and tx receipts
+* Fully sync the [Geth](https://github.com/ethereum/go-ethereum) client up to the latest block, by whatever method. (snap, full, full archive)
+* Ind
