@@ -69,4 +69,8 @@ $ python3 txsubstate.py -s 1 -e 10000000 -d ./txsubstate -i 1000
 
 #### Index blocks, uncles and tx receipts
 * Fully sync the [Geth](https://github.com/ethereum/go-ethereum) client up to the latest block, by whatever method. (snap, full, full archive)
-* Ind
+* Index block, uncles and tx receipts
+  * Set ```geth_ipc_path``` and ```db_socket```, ```db_user```, ```db_pass``` properly before running the code below.
+```sh
+$ node block_tx_contract.js
+```
