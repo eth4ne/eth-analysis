@@ -434,14 +434,14 @@ def insert_account(cursor, address, type):
 def insert_contract(cursor, address, blocknumber, txindex, code):
   address = bytes.fromhex(address)
   code = bytes.fromhex(code)
-  sql = "INSERT INTO `contracts` (`address`, `blocknumber`, `txindex`, `code`) VALUES (%s, %s, %s, %s);"
+  sql = "INSERT INTO `contracts` (`address`, `blocknumber`, `transactionindex`, `code`) VALUES (%s, %s, %s, %s);"
   try:
     cursor.execute(sql, (address, blocknumber, txindex, code))
   except pymysql.err.IntegrityError:
     update_contract(cursor, address, blocknumber, txindex, code)
 
 def update_contract(cursor, address, blocknumber, txindex, code):
-  sql = "UPDATE `contracts` SET `code`=%s, `blocknumber`=%s, `txindex`=%s WHERE `address`=%s;"
+  sql = "UPDATE `contracts` SET `code`=%s, `blocknumber`=%s, `transactionindex`=%s WHERE `address`=%s;"
   cursor.execute(sql, (code, blocknumber, txindex, address)) 
 
 def update_account_type(cursor, address_id, type):
