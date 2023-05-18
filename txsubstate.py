@@ -277,7 +277,7 @@ def run(_from, _to):
                     address_id = insert_account(cursor, write['address'], 9)
                   else:
                     update_account_type(cursor, address_id, 9)
-                  insert_contract(cursor, write['address'], tx['hash'], write['code'])
+                  insert_contract(cursor, write['address'], blocknumber, tx['index'], write['code'])
                 else:
                   if tx['deployedca'] == write['address']:
                     address_id = find_account_id(cursor, write['address'])
@@ -285,12 +285,11 @@ def run(_from, _to):
                       address_id = insert_account(cursor, write['address'], 7)
                     else:
                       update_account_type(cursor, address_id, 7)
-                    insert_contract(cursor, write['address'], tx['hash'], write['code'])
+                    insert_contract(cursor, write['address'], blocknumber, tx['index'], write['code'])
                   else:
                     print('Error: deployed ca and the address mismatch')
                     print('DeployedCA: {}, address: {}'.format(tx['deployedca'], write['address']))
                     exit(1)
-                    #insert_contract(cursor, write['address'], tx['hash'], write['code'])
             
             if run_account == True:
               if write['code'] == None:
@@ -424,7 +423,7 @@ def update_tx(cursor, txhash, txclass):
   cursor.execute(sql, (txclass, txhash))
 
 def insert_account(cursor, address, type):
-  addresshash = bytes.fromhex(Web3.toHex(Web3.keccak(hexstr=address))[2:])
+  addresshash = bytes.fromhex(Web3.to_hex(Web3.keccak(hexstr=address))[2:])
   address = bytes.fromhex(address)
   sql = "INSERT INTO `addresses` (`address`, `hash`, `_type`) VALUES (%s, %s, %s);"
   cursor.execute(sql, (address, addresshash, type))
@@ -432,19 +431,18 @@ def insert_account(cursor, address, type):
   account_type_cache[address] = type
   return cursor.lastrowid
 
-def insert_contract(cursor, address, creationtx, code):
+def insert_contract(cursor, address, blocknumber, txindex, code):
   address = bytes.fromhex(address)
-  creationtx = bytes.fromhex(creationtx)
   code = bytes.fromhex(code)
-  sql = "INSERT INTO `contracts` (`address`, `creationtx`, `code`) VALUES (%s, %s, %s);"
+  sql = "INSERT INTO `contracts` (`address`, `blocknumber`, `txindex`, `code`) VALUES (%s, %s, %s, %s);"
   try:
-    cursor.execute(sql, (address, creationtx, code))
+    cursor.execute(sql, (address, blocknumber, txindex, code))
   except pymysql.err.IntegrityError:
-    update_contract(cursor, address, creationtx, code)
+    update_contract(cursor, address, blocknumber, txindex, code)
 
-def update_contract(cursor, address, creationtx, code):
-  sql = "UPDATE `contracts` SET `code`=%s, `creationtx`=%s WHERE `address`=%s;"
-  cursor.execute(sql, (code, creationtx, address)) 
+def update_contract(cursor, address, blocknumber, txindex, code):
+  sql = "UPDATE `contracts` SET `code`=%s, `blocknumber`=%s, `txindex`=%s WHERE `address`=%s;"
+  cursor.execute(sql, (code, blocknumber, txindex, address)) 
 
 def update_account_type(cursor, address_id, type):
   if address_id in account_type_cache and account_type_cache[address_id] == type:
