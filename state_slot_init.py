@@ -25,8 +25,8 @@ conn.commit()
 
 for account, balance in alloc:
   address = account[2:]
-  addresshash = Web3.toHex(Web3.keccak(hexstr=address))[2:]
-
+  #addresshash = Web3.toHex(Web3.keccak(hexstr=address))[2:]
+  addresshash = Web3.to_hex(Web3.keccak(hexstr=address))[2:]
   sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
   cursor.execute(sql, (address,))
   result = cursor.fetchone()

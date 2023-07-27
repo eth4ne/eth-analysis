@@ -8,7 +8,7 @@ from web3 import Web3
 
 db_host = 'localhost'
 db_user = 'ethereum'
-db_pass = '' #fill in the MariaDB/MySQL password.
+db_pass = '1234' #fill in the MariaDB/MySQL password.
 db_name = 'ethereum'
 
 parser = argparse.ArgumentParser(description='TxSubstate parser')
@@ -226,7 +226,8 @@ def run(_from, _to):
               elif k == 'StorageRoot':
                 write['storageroot'] = v[2:]
               elif k == 'Code':
-                write['code'] = v
+                if v != '0x':
+                   write['code'] = v
               elif k == 'Storage':
                 pass
               elif k == 'slot':
