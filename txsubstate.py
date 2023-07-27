@@ -8,7 +8,7 @@ from web3 import Web3
 
 db_host = 'localhost'
 db_user = 'ethereum'
-db_pass = '1234' #fill in the MariaDB/MySQL password.
+db_pass = '' #fill in the MariaDB/MySQL password.
 db_name = 'ethereum'
 
 parser = argparse.ArgumentParser(description='TxSubstate parser')

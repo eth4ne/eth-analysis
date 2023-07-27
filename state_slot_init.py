@@ -4,7 +4,7 @@ from web3 import Web3
 
 db_host = 'localhost'
 db_user = 'ethereum'
-db_pass = '1234' #fill in the MariaDB/MySQL password.
+db_pass = '' #fill in the MariaDB/MySQL password.
 db_name = 'ethereum'
 
 conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host, user=user, password=password, database=database, cursorclass=pymysql.cursors.DictCursor)
