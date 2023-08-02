@@ -180,9 +180,26 @@ def run(_from, _to):
               tx['to'] = v[2:]
             elif k == 'DeployedCA':
               tx['deployedca'] = v[2:]
-          readlist = txbody.split('@')[1].split('#')[0].split('\n')[1:-1]
+          
+          # readlist = txbody.split('@')[1].split('#')[0].split('\n')[1:-1]
+          readlist = txbody.split('@')[1].split('#')[0].split('.')[1:]
           for j in readlist:
-            address = j.split(':')[1][2:]
+            address = j.split('\n')[0].split(':')[1][2:]
+            if len(j.split('\n')[1]) > 0:
+              slots = j.split('\n')[1:-1]
+            else:
+              slots = []
+            # print("Address", address)
+            
+            
+            if len(slots) > 0: # read slot exists
+              for slot in slots:
+                continue
+                slot_id = slot.split(',')[0].split(':')[1]
+                value = slot.split(',')[1].split(':')[1]
+                print('slot:', slot_id, 'value:', value)
+          
+          
             if run_state == True:
               address_id = find_account_id(cursor, address)
               if address_id == None:
@@ -362,6 +379,7 @@ def get_latest_state(cursor):
 def find_account_id(cursor, address):
   if address in account_cache:
     return account_cache[address]
+  # print("func find_account_id/ address: ", address) # jhkim: 12M block에서 에러발생. readlist의 slot이 추가되었기 때문
   address_bytes = bytes.fromhex(address)
   sql = "SELECT * FROM `addresses` WHERE `address`=%s;"
   cursor.execute(sql, (address_bytes,))
