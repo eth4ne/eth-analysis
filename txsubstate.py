@@ -186,17 +186,17 @@ def run(_from, _to):
           for j in readlist:
             address = j.split('\n')[0].split(':')[1][2:]
             if len(j.split('\n')[1]) > 0:
-              slots = j.split('\n')[1:-1]
+              readslots = j.split('\n')[1:-1]
             else:
-              slots = []
+              readslots = []
             # print("Address", address)
             
             
-            if len(slots) > 0: # read slot exists
-              for slot in slots:
+            if len(readslots) > 0: # read slot exists
+              for readslot in readslots:
                 continue
-                slot_id = slot.split(',')[0].split(':')[1]
-                value = slot.split(',')[1].split(':')[1]
+                slot_id = readslot.split(',')[0].split(':')[1]
+                value = readslot.split(',')[1].split(':')[1]
                 print('slot:', slot_id, 'value:', value)
           
           
@@ -442,7 +442,7 @@ def update_tx(cursor, txhash, txclass):
   cursor.execute(sql, (txclass, txhash))
 
 def insert_account(cursor, address, type):
-  addresshash = bytes.fromhex(Web3.to_hex(Web3.keccak(hexstr=address))[2:])
+  addresshash = bytes.fromhex(Web3.toHex(Web3.keccak(hexstr=address))[2:])
   address = bytes.fromhex(address)
   sql = "INSERT INTO `addresses` (`address`, `hash`, `_type`) VALUES (%s, %s, %s);"
   cursor.execute(sql, (address, addresshash, type))
