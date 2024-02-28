@@ -4,7 +4,7 @@ from web3 import Web3
 
 db_host = 'localhost'
 db_user = 'ethereum'
-db_pass = '1234' #fill in the MariaDB/MySQL password.
+db_pass = '' #fill in the MariaDB/MySQL password.
 db_name = 'ethereum'
 
 conn_mariadb = lambda host, user, password, database: pymysql.connect(host=host, user=user, password=password, database=database, cursorclass=pymysql.cursors.DictCursor)
@@ -26,7 +26,6 @@ conn.commit()
 for account, balance in alloc:
   address = account[2:]
   addresshash = Web3.toHex(Web3.keccak(hexstr=address))[2:]
-
   sql = "SELECT * FROM `addresses` WHERE `address`=UNHEX(%s);"
   cursor.execute(sql, (address,))
   result = cursor.fetchone()

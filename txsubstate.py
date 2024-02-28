@@ -180,9 +180,26 @@ def run(_from, _to):
               tx['to'] = v[2:]
             elif k == 'DeployedCA':
               tx['deployedca'] = v[2:]
-          readlist = txbody.split('@')[1].split('#')[0].split('\n')[1:-1]
+          
+          # readlist = txbody.split('@')[1].split('#')[0].split('\n')[1:-1]
+          readlist = txbody.split('@')[1].split('#')[0].split('.')[1:]
           for j in readlist:
-            address = j.split(':')[1][2:]
+            address = j.split('\n')[0].split(':')[1][2:]
+            if len(j.split('\n')[1]) > 0:
+              readslots = j.split('\n')[1:-1]
+            else:
+              readslots = []
+            # print("Address", address)
+            
+            
+            if len(readslots) > 0: # read slot exists
+              for readslot in readslots:
+                continue
+                slot_id = readslot.split(',')[0].split(':')[1]
+                value = readslot.split(',')[1].split(':')[1]
+                print('slot:', slot_id, 'value:', value)
+          
+          
             if run_state == True:
               address_id = find_account_id(cursor, address)
               if address_id == None:
@@ -226,7 +243,8 @@ def run(_from, _to):
               elif k == 'StorageRoot':
                 write['storageroot'] = v[2:]
               elif k == 'Code':
-                write['code'] = v
+                if v != '0x':
+                   write['code'] = v
               elif k == 'Storage':
                 pass
               elif k == 'slot':
@@ -361,6 +379,7 @@ def get_latest_state(cursor):
 def find_account_id(cursor, address):
   if address in account_cache:
     return account_cache[address]
+  # print("func find_account_id/ address: ", address) # jhkim: 12M block에서 에러발생. readlist의 slot이 추가되었기 때문
   address_bytes = bytes.fromhex(address)
   sql = "SELECT * FROM `addresses` WHERE `address`=%s;"
   cursor.execute(sql, (address_bytes,))
@@ -423,7 +442,7 @@ def update_tx(cursor, txhash, txclass):
   cursor.execute(sql, (txclass, txhash))
 
 def insert_account(cursor, address, type):
-  addresshash = bytes.fromhex(Web3.to_hex(Web3.keccak(hexstr=address))[2:])
+  addresshash = bytes.fromhex(Web3.toHex(Web3.keccak(hexstr=address))[2:])
   address = bytes.fromhex(address)
   sql = "INSERT INTO `addresses` (`address`, `hash`, `_type`) VALUES (%s, %s, %s);"
   cursor.execute(sql, (address, addresshash, type))
