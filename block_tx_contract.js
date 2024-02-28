@@ -1,6 +1,6 @@
-const Web3 = require('web3');
+const { Web3 } = require('web3');
+const { IpcProvider } = require('web3-providers-ipc');
 const mariadb = require('mariadb');
-const net = require('net');
 
 const db_socket = '/run/mysqld/mysqld.sock';
 
@@ -22,7 +22,7 @@ function sleep(ms) {
 }
 
 function connect_web3() {
-  return new Web3(geth_ipc_path, net);
+  return new Web3(new IpcProvider(geth_ipc_path));
 }
 
 function connect_db() {
