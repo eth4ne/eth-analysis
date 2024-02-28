@@ -138,7 +138,8 @@ async function insert_block_batch (conn, block, txn) {
     if (block.logsBloom !== "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000") {
       logsbloom = block.logsBloom;
     }
-    await conn.query("INSERT INTO `blocks` (`number`, `timestamp`, `transactions`, `miner`, `difficulty`, `totaldifficulty`, `size`, `gasused`, `gaslimit`, `extradata`, `hash`, `parenthash`, `sha3uncles`, `stateroot`, `nonce`, `receiptsroot`, `transactionsroot`, `mixhash`, `logsbloom`, `basefee`) VALUES (?, ?, ?, UNHEX(SUBSTRING(?, 3)), ?, ?, ?, ?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), ?);", [block.number, block.timestamp, txn, block.miner, block.difficulty, block.totalDifficulty, block.size, block.gasUsed, block.gasLimit, block.extraData, block.hash, block.parentHash, block.sha3Uncles, block.stateRoot, block.nonce, block.receiptsRoot, block.transactionsRoot, block.mixHash, logsbloom, basefee]);
+    let nonce = block.nonce.toString(16);
+    await conn.query("INSERT INTO `blocks` (`number`, `timestamp`, `transactions`, `miner`, `difficulty`, `totaldifficulty`, `size`, `gasused`, `gaslimit`, `extradata`, `hash`, `parenthash`, `sha3uncles`, `stateroot`, `nonce`, `receiptsroot`, `transactionsroot`, `mixhash`, `logsbloom`, `basefee`) VALUES (?, ?, ?, UNHEX(SUBSTRING(?, 3)), ?, ?, ?, ?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(?), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), ?);", [block.number, block.timestamp, txn, block.miner, block.difficulty, block.totalDifficulty, block.size, block.gasUsed, block.gasLimit, block.extraData, block.hash, block.parentHash, block.sha3Uncles, block.stateRoot, nonce, block.receiptsRoot, block.transactionsRoot, block.mixHash, logsbloom, basefee]);
   } catch (err) {
     console.log(err);
     console.log('Error insert: blk #%d', block.number);
@@ -188,7 +189,8 @@ async function insert_uncle_batch (conn, block, uncle, uncleposition) {
     if (uncle.logsBloom !== "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000") {
       logsbloom = uncle.logsBloom;
     }
-    await conn.query("INSERT INTO `uncles` (`blocknumber`, `uncleheight`, `uncleposition`, `timestamp`, `miner`, `difficulty`, `size`, `gasused`, `gaslimit`, `extradata`, `hash`, `parenthash`, `sha3uncles`, `stateroot`, `nonce`, `receiptsroot`, `transactionsroot`, `mixhash`, `logsbloom`, `basefee`) VALUES (?, ?, ?, ?, UNHEX(SUBSTRING(?, 3)), ?, ?, ?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), ?);", [block.number, uncle.number, uncleposition, uncle.timestamp, uncle.miner, uncle.difficulty, uncle.size, uncle.gasUsed, uncle.gasLimit, uncle.extraData, uncle.hash, uncle.parentHash, uncle.sha3Uncles, uncle.stateRoot, uncle.nonce, uncle.receiptsRoot, uncle.transactionsRoot, uncle.mixHash, logsbloom, basefee]);
+    let nonce = uncle.nonce.toString(16);
+    await conn.query("INSERT INTO `uncles` (`blocknumber`, `uncleheight`, `uncleposition`, `timestamp`, `miner`, `difficulty`, `size`, `gasused`, `gaslimit`, `extradata`, `hash`, `parenthash`, `sha3uncles`, `stateroot`, `nonce`, `receiptsroot`, `transactionsroot`, `mixhash`, `logsbloom`, `basefee`) VALUES (?, ?, ?, ?, UNHEX(SUBSTRING(?, 3)), ?, ?, ?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(?), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)), ?);", [block.number, uncle.number, uncleposition, uncle.timestamp, uncle.miner, uncle.difficulty, uncle.size, uncle.gasUsed, uncle.gasLimit, uncle.extraData, uncle.hash, uncle.parentHash, uncle.sha3Uncles, uncle.stateRoot, nonce, uncle.receiptsRoot, uncle.transactionsRoot, uncle.mixHash, logsbloom, basefee]);
   } catch (err) {
     console.log(err);
     console.log('Error insert: blk #%d, ucl #%d', block.number, uncleposition);
@@ -224,7 +226,7 @@ async function stationkeep() {
     conn.query("SELECT * FROM `blocks` ORDER BY `number` DESC LIMIT 1;").then(async function(res) {
       let web3 = connect_web3();
       let latest = await web3.eth.getBlock('latest');
-      let target = Math.min(latest.number, block_limit+1);
+      let target = Math.min(Number(latest.number), block_limit+1);
       if (res.length === 0) {
         console.error('Run from start to %d', target-1);
         run(0, target-1);
