@@ -169,8 +169,12 @@ async function insert_tx_accesslist_batch (conn, tx) {
   try {
     let accesslist = tx.accessList;
     for (let i in accesslist) {
-      for (let j in accesslist[i].storageKeys) {
-        await conn.query("INSERT INTO `transactions_accesslist` (`blocknumber`, `transactionindex`, `address`, `storagekeys`) VALUES (?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)));", [tx.blockNumber, tx.transactionIndex, accesslist[i].address, accesslist[i].storageKeys[j]]);
+      if (accesslist[i].storageKeys.length === 0) {
+        await conn.query("INSERT INTO `transactions_accesslist` (`blocknumber`, `transactionindex`, `address`) VALUES (?, ?, UNHEX(SUBSTRING(?, 3)));", [tx.blockNumber, tx.transactionIndex, accesslist[i].address]);
+      } else {
+        for (let j in accesslist[i].storageKeys) {
+          await conn.query("INSERT INTO `transactions_accesslist` (`blocknumber`, `transactionindex`, `address`, `storagekeys`) VALUES (?, ?, UNHEX(SUBSTRING(?, 3)), UNHEX(SUBSTRING(?, 3)));", [tx.blockNumber, tx.transactionIndex, accesslist[i].address, accesslist[i].storageKeys[j]]);
+        }
       }
     }
   } catch (err) {
